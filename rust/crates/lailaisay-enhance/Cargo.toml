@@ -1,0 +1,15 @@
+[package]
+name = "lailaisay-enhance"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Optional AI semantic enhancement (Ollama / Groq / Gemini HTTP)"
+
+[dependencies]
+lailaisay-core.workspace = true
+regex.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true

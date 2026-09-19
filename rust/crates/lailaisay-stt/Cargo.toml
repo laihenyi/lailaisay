@@ -1,0 +1,42 @@
+[package]
+name = "lailaisay-stt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Local speech-to-text for lailaisay (whisper.cpp via whisper-rs, plus a fixture backend)"
+
+[features]
+default = []
+# Compiles whisper.cpp. Off by default so `cargo test` stays lightweight on CI.
+whisper = ["dep:whisper-rs"]
+# whisper.cpp Metal backend (`whisper-rs/metal`). On macOS this is already
+# enabled whenever `whisper` is on (see target.dependencies below).
+metal = ["whisper", "whisper-rs/metal"]
+vulkan = ["whisper", "whisper-rs/vulkan", "gpu-probe"]
+process-whisper = []
+gpu-probe = ["dep:ash"]
+# Microphone capture via cpal (needs ALSA/Pulse on Linux, CoreAudio on macOS).
+mic = ["dep:cpal"]
+
+[dependencies]
+lailaisay-core.workspace = true
+cpal = { workspace = true, optional = true }
+hound.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ash = { version = "0.38", optional = true }
+whisper-rs = { version = "=0.13.2", optional = true }
+
+# Least footgun: `cargo run -p lailaisay-app --features mic,whisper` on a Mac
+# compiles Metal without a separate `--features metal`.
+[target.'cfg(target_os = "macos")'.dependencies]
+whisper-rs = { version = "=0.13.2", optional = true, features = ["metal"] }
+
+[[bin]]
+name = "lailaisay-whisper-worker"
+path = "src/bin/whisper_worker.rs"
+required-features = ["whisper"]
+
+[dev-dependencies]
+tempfile = "3"

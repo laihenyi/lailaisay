@@ -1,0 +1,293 @@
+name: rust
+
+on:
+  workflow_dispatch:
+    inputs:
+      windows_only:
+        description: Run only Windows validation for packaging changes
+        type: boolean
+        default: false
+  push:
+    paths:
+      - "rust/**"
+      - ".github/workflows/rust.yml"
+  pull_request:
+    paths:
+      - "rust/**"
+      - ".github/workflows/rust.yml"
+
+jobs:
+  test:
+    if: ${{ !inputs.windows_only }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify Rust-only application tree and history
+        run: |
+          test -z "$(git ls-files '*.swift' '*.xcodeproj/*' '*.xcworkspace/*')"
+          test ! -d ../Hex
+          test ! -d ../HexTests
+          git rev-list --objects --all > "$RUNNER_TEMP/repository-objects.txt"
+          if grep -Ei '\.swift$|\.xcodeproj(/|$)|\.xcworkspace(/|$)' "$RUNNER_TEMP/repository-objects.txt"; then
+            echo "Legacy application source remains reachable in Git history" >&2
+            exit 1
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+      - name: egui / winit build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+            libxkbcommon-dev libgl1-mesa-dev libegl1-mesa-dev
+      - name: Test workspace
+        run: cargo test --workspace --features lailaisay-stt/process-whisper
+      - name: CLI fixture proof
+        run: cargo run -p lailaisay-cli -- transcribe --backend dummy --file fixtures/sample.wav
+      - name: lailaisay-app once (dummy, no TCC)
+        run: cargo run -p lailaisay-app -- --once
+      - name: mac-smoke script
+        run: bash scripts/mac-smoke.sh
+        env:
+          TOK_SMOKE_SKIP_TEST: "1"
+      - name: Validate macOS lailaisay.app packaging (layout only)
+        run: |
+          bash -n scripts/package-macos-app.sh
+          bash -n scripts/notarize-macos.sh
+          test ! -e scripts/mac-intel-smoke.sh
+          python3 -c "import xml.etree.ElementTree as ET; ET.parse('macos/Info.plist')"
+          python3 -c "import xml.etree.ElementTree as ET; ET.parse('macos/lailaisay.entitlements')"
+          python3 scripts/generate-appicon.py --check
+          ! grep -q CFBundleIconName macos/Info.plist || test -f macos/Assets.car
+          grep -q 'com.apple.security.device.audio-input' macos/lailaisay.entitlements
+          grep -q 'com.apple.security.automation.apple-events' macos/lailaisay.entitlements
+          ! grep -q 'com.apple.security.app-sandbox' macos/lailaisay.entitlements
+          ! grep -q 'com.apple.security.get-task-allow' macos/lailaisay.entitlements
+          if git ls-files | grep -E '\.p8$|AuthKey_'; then
+            echo "refusing tracked App Store Connect API key material" >&2
+            exit 1
+          fi
+          chmod +x scripts/package-macos-app.sh scripts/notarize-macos.sh
+          ! ./scripts/package-macos-app.sh --help | grep -q -- '--intel'
+          ./scripts/package-macos-app.sh --help | grep -q -- '--developer-id'
+          if ./scripts/package-macos-app.sh --intel; then
+            echo "Intel Mac packaging must be rejected" >&2
+            exit 1
+          fi
+          if ./scripts/package-macos-app.sh --layout-only --target x86_64-apple-darwin; then
+            echo "x86_64-apple-darwin packaging must be rejected" >&2
+            exit 1
+          fi
+          ./scripts/notarize-macos.sh --help | grep -q -- 'notarytool'
+          ./scripts/package-macos-app.sh --layout-only
+          test -f dist/lailaisay.app/Contents/Info.plist
+          grep -q 'com.yikai.lailaisay' dist/lailaisay.app/Contents/Info.plist
+          ! grep -q 'xyz.2qs.Tok' dist/lailaisay.app/Contents/Info.plist
+          grep -q LSUIElement dist/lailaisay.app/Contents/Info.plist
+          grep -q CFBundleIconFile dist/lailaisay.app/Contents/Info.plist
+          ! grep -q CFBundleIconName dist/lailaisay.app/Contents/Info.plist
+          test -f dist/lailaisay.app/Contents/Resources/AppIcon.icns
+          test ! -f dist/lailaisay.app/Contents/Resources/Assets.car
+          test -x dist/lailaisay.app/Contents/MacOS/lailaisay-app
+          grep -q '開啟設定' scripts/package-windows.ps1
+          grep -q 'lailaisay-app.exe' scripts/package-windows.ps1
+
+  macos:
+    if: ${{ !inputs.windows_only }}
+    # Explicit Apple Silicon runner; Intel is not a supported product target.
+    runs-on: macos-15
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: rust
+    env:
+      RUSTFLAGS: "-D warnings"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify native Apple Silicon toolchain
+        run: |
+          test "$(uname -m)" = arm64
+          rustc -vV | grep -q 'host: aarch64-apple-darwin'
+          xcrun --find clang
+      - name: Test macOS application, input and paste
+        run: cargo test --locked -p lailaisay-app -p lailaisay-input -p lailaisay-paste --features lailaisay-app/mic,lailaisay-app/whisper --lib
+      - name: Build release app with microphone and Whisper
+        run: cargo build --locked --release -p lailaisay-app --features mic,whisper
+      - name: Package and verify real macOS app
+        run: |
+          ./scripts/package-macos-app.sh --skip-build --zip
+          test "$(lipo -archs dist/lailaisay.app/Contents/MacOS/lailaisay-app)" = arm64
+          codesign --verify --deep --strict --verbose=2 dist/lailaisay.app
+          test -s dist/lailaisay.app/Contents/Resources/AppIcon.icns
+          test -s dist/lailaisay.app/Contents/Resources/FONT-LICENSE.txt
+      - name: Run packaged app without requesting permissions
+        env:
+          TOK_CONFIG: ${{ runner.temp }}/lailaisay-ci-settings.json
+          TOK_MODELS_DIR: ${{ runner.temp }}/lailaisay-ci-models
+        run: |
+          printf '{}\n' > "$TOK_CONFIG"
+          dist/lailaisay.app/Contents/MacOS/lailaisay-app --once > "$RUNNER_TEMP/lailaisay-macos-smoke.txt"
+          cat "$RUNNER_TEMP/lailaisay-macos-smoke.txt"
+          grep -q '去台南。' "$RUNNER_TEMP/lailaisay-macos-smoke.txt"
+      - name: Upload macOS Apple Silicon app
+        uses: actions/upload-artifact@v4
+        with:
+          name: lailaisay-macOS-arm64-${{ github.sha }}
+          path: rust/dist/lailaisay.app.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  # Build an isolated Vulkan worker plus runtime-selected CPU workers.
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Validate Windows packaging scripts
+        shell: pwsh
+        run: |
+          foreach ($script in Get-ChildItem scripts/*windows*.ps1) {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
+            if ($parseErrors.Count -gt 0) { throw ($parseErrors | Out-String) }
+          }
+      - name: Validate installer compiler and prerequisites
+        shell: pwsh
+        run: |
+          choco upgrade innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed" }
+          # Compile a layout-only fixture before spending time building Rust.
+          # This temporary installer is never executed or published.
+          $fixture = Join-Path $env:RUNNER_TEMP 'lailaisay Installer Layout'
+          New-Item -ItemType Directory -Force $fixture | Out-Null
+          foreach ($file in @('lailaisay-app.exe', 'lailaisay-whisper-cpu.exe', 'lailaisay-whisper-avx2.exe', 'lailaisay-whisper-vulkan.exe', 'lailaisay-diagnostics.cmd')) {
+            'layout-only fixture' | Set-Content (Join-Path $fixture $file)
+          }
+          Copy-Item ../LICENSE (Join-Path $fixture 'LICENSE')
+          Copy-Item crates/lailaisay-app/assets/fonts/OFL.txt (Join-Path $fixture 'FONT-LICENSE.txt')
+          ./scripts/package-windows-installer.ps1 -PayloadDir $fixture -Version 0.0.0.0 -OutDir "$env:RUNNER_TEMP/lailaisay Installer Layout Output"
+      - name: lailaisay-core tests
+        run: cargo test -p lailaisay-core --lib
+      - name: lailaisay-cli build (no whisper)
+        run: cargo build -p lailaisay-cli
+      - name: lailaisay-input tests
+        run: cargo test -p lailaisay-input --lib
+      - name: lailaisay-paste tests
+        run: cargo test -p lailaisay-paste --lib
+      - name: lailaisay-app tests (tray hide-to-tray + host)
+        run: cargo test -p lailaisay-app --lib
+      - name: Install Vulkan build SDK
+        uses: humbletim/install-vulkan-sdk@30ba978f977e81b72d091fc8888feb1fb26f9aff # v1.2
+        with:
+          version: 1.4.309.0
+          cache: true
+      - name: Build complete Windows release
+        shell: pwsh
+        run: ./scripts/build-windows.ps1
+      - name: Verify portable Whisper configuration
+        shell: pwsh
+        run: |
+          $caches = Get-ChildItem target/release/build/whisper-rs-sys-*/out/build/CMakeCache.txt
+          if (-not $caches) { throw "Whisper CMake cache missing" }
+          foreach ($cache in $caches) {
+            foreach ($flag in @("NATIVE", "AVX", "AVX2", "AVX512", "FMA", "F16C")) {
+              if (-not (Select-String -Path $cache -Pattern "^GGML_${flag}:BOOL=OFF$")) {
+                throw "Nonportable Whisper setting: $flag in $cache"
+              }
+            }
+          }
+      - name: Verify AVX2 worker configuration
+        shell: pwsh
+        run: |
+          $caches = Get-ChildItem target/windows-avx2/release/build/whisper-rs-sys-*/out/build/CMakeCache.txt
+          if (-not $caches) { throw "AVX2 cache missing" }
+          foreach ($cache in $caches) {
+            foreach ($flag in @("AVX", "AVX2", "FMA", "F16C")) {
+              if (-not (Select-String -Path $cache -Pattern "^GGML_${flag}:BOOL=ON$")) { throw "Missing $flag" }
+            }
+            foreach ($flag in @("NATIVE", "AVX512")) {
+              if (-not (Select-String -Path $cache -Pattern "^GGML_${flag}:BOOL=OFF$")) { throw "Unsafe $flag" }
+            }
+          }
+      - name: Download small-model test assets
+        shell: pwsh
+        timeout-minutes: 6
+        run: |
+          curl.exe --fail --location --retry 2 --max-time 120 https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin --output "$env:RUNNER_TEMP/lailaisay-small.bin"
+          if ($LASTEXITCODE -ne 0) { throw "Model download failed" }
+          curl.exe --fail --location --retry 2 --max-time 60 https://raw.githubusercontent.com/ggml-org/whisper.cpp/master/samples/jfk.wav --output "$env:RUNNER_TEMP/lailaisay-jfk.wav"
+          if ($LASTEXITCODE -ne 0) { throw "Audio download failed" }
+      - name: Run real Whisper inference in release app
+        shell: pwsh
+        timeout-minutes: 12
+        run: |
+          $env:TOK_CONFIG = "$env:RUNNER_TEMP/lailaisay-smoke-settings.json"
+          '{"outputLanguage":"en","preferTraditionalChinese":false}' | Set-Content $env:TOK_CONFIG
+          $p = Start-Process target/release/lailaisay-app.exe -ArgumentList @("--once", "--backend", "whisper", "--model", "$env:RUNNER_TEMP/lailaisay-small.bin", "--file", "$env:RUNNER_TEMP/lailaisay-jfk.wav") -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP/lailaisay-inference.out" -RedirectStandardError "$env:RUNNER_TEMP/lailaisay-inference.err"
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          while (-not $p.WaitForExit(10000)) {
+            Get-Content "$env:RUNNER_TEMP/lailaisay-inference.err" -Tail 3
+            if ($timer.Elapsed.TotalMinutes -gt 10) {
+              $p.Kill()
+              throw "Small-model inference exceeded 10 minutes"
+            }
+          }
+          $p.Refresh()
+          Write-Output "Total inference elapsed: $($timer.Elapsed.TotalSeconds) seconds"
+          Get-Content "$env:RUNNER_TEMP/lailaisay-inference.err"
+          $text = Get-Content "$env:RUNNER_TEMP/lailaisay-inference.out" -Raw
+          Write-Output $text
+          if ($p.ExitCode -ne 0) { throw "Whisper exited with $($p.ExitCode)" }
+          if ($text -notmatch "country") { throw "Expected speech was not transcribed" }
+      - name: Package portable Windows release
+        shell: pwsh
+        run: |
+          ./scripts/package-windows.ps1 -SkipBuild -BinPath target\release\lailaisay-app.exe -Zip
+          if (-not (Test-Path dist\windows\lailaisay\lailaisay-app.exe)) { throw "missing lailaisay-app.exe" }
+          if (-not (Test-Path dist\windows\lailaisay\README.txt)) { throw "missing README.txt" }
+          if (-not (Test-Path dist\windows\lailaisay-windows.zip)) { throw "missing zip" }
+      - name: Upload Windows portable app
+        uses: actions/upload-artifact@v4
+        with:
+          name: lailaisay-Windows-x64-${{ github.sha }}
+          path: rust/dist/windows/lailaisay-windows.zip
+          if-no-files-found: error
+          retention-days: 14
+      - name: Build Windows installer
+        shell: pwsh
+        run: ./scripts/package-windows-installer.ps1
+      - name: Test install, upgrade, inference and uninstall
+        shell: pwsh
+        timeout-minutes: 15
+        run: ./scripts/test-windows-installer.ps1
+      - name: Upload installer test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lailaisay-Installer-Logs-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/lailaisay Installer Smoke/*.err
+            ${{ runner.temp }}/lailaisay Installer Smoke/*.out
+            ${{ runner.temp }}/lailaisay Installer Smoke/*.log
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: lailaisay-Windows-Installer-x64-${{ github.sha }}
+          path: |
+            rust/dist/windows/installer/lailaisay-Setup-*-x64.exe
+            rust/dist/windows/installer/lailaisay-Setup-*-x64.exe.sha256
+          if-no-files-found: error
+          retention-days: 14
+      - name: CLI process smoke
+        run: cargo run -p lailaisay-cli -- process --text "去台南。"

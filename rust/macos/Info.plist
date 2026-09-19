@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>zh-Hant</string>
+	<key>CFBundleDisplayName</key>
+	<string>lailaisay</string>
+	<key>CFBundleExecutable</key>
+	<string>lailaisay-app</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.yikai.lailaisay</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>lailaisay</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSSupportsAutomaticGraphicsSwitching</key>
+	<true/>
+	<key>NSAccessibilityUsageDescription</key>
+	<string>lailaisay needs Accessibility to watch the hold-to-talk hotkey and paste transcribed text into the app you were using.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>lailaisay needs Automation to paste transcribed text into the app that was frontmost when you pressed the hotkey.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>lailaisay needs microphone access to record and transcribe your speech.</string>
+</dict>
+</plist>

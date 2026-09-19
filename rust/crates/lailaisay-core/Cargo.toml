@@ -1,0 +1,17 @@
+[package]
+name = "lailaisay-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "lailaisay pipeline: settings, hotkey state machine, filters, replacements, punctuation"
+
+[dependencies]
+dirs.workspace = true
+fancy-regex = "0.14"
+pinyin.workspace = true
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+zhconv.workspace = true

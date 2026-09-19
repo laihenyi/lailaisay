@@ -1,0 +1,11 @@
+[package]
+name = "lailaisay-paste"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Clipboard copy; macOS AX paste; Windows SendInput Ctrl+V"
+
+[dependencies]
+lailaisay-core.workspace = true
+arboard.workspace = true
+thiserror.workspace = true

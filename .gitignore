@@ -1,0 +1,30 @@
+.DS_Store
+.AppleDouble
+.LSOverride
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.log
+*.bak
+*.backup
+*.tmp
+*.temp
+
+# Rust
+rust/target/
+**/target/
+
+# Local secrets / machine paths
+.env
+.env.*
+!.env.example
+*.p8
+AuthKey_*.p8
+
+# macOS packaging leftovers
+*.app
+*.dSYM
+DerivedData/
+*.xcresult

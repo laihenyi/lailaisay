@@ -1,0 +1,51 @@
+[package]
+name = "lailaisay-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "lailaisay host: tray + hotkey on macOS and Windows; --once / --settings on Linux"
+
+[lib]
+name = "lailaisay_app"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lailaisay-app"
+path = "src/main.rs"
+
+[features]
+default = []
+# On macOS, `whisper` also compiles whisper.cpp Metal (see lailaisay-stt).
+whisper = ["lailaisay-stt/whisper", "lailaisay-stt/process-whisper"]
+metal = ["lailaisay-stt/metal"]
+mic = ["lailaisay-stt/mic"]
+
+[dependencies]
+lailaisay-core.workspace = true
+lailaisay-stt.workspace = true
+lailaisay-enhance.workspace = true
+lailaisay-input.workspace = true
+lailaisay-paste.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+eframe = { version = "0.32", default-features = false, features = ["default_fonts", "accesskit", "glow", "x11", "wayland"] }
+egui = "0.32"
+ab_glyph = "0.2"
+
+# Native file dialogs on macOS and Windows.
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+rfd = { version = "0.15", default-features = false, features = ["common-controls-v6"] }
+
+[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+tray-icon = "0.19"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc = "0.2"
+
+# objc 0.2 macros emit this legacy conditional in the consuming crate.
+# Register only that known value; other unexpected cfg values remain warnings.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }

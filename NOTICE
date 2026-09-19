@@ -1,0 +1,19 @@
+lailaisay
+https://github.com/laihenyi/lailaisay
+
+lailaisay is derived from Hex (https://github.com/kitlangton/Hex), which is licensed
+under the MIT License. Copyright (c) 2025 Kit Langton. That copyright notice
+and the MIT permission notice are retained in LICENSE.
+
+This repository includes a substantial Rust rewrite of the dictation pipeline
+and macOS host in rust/. lailaisay modifications and that rewrite are Copyright (c)
+2025–2026 James Lai. lailaisay (bundle id com.yikai.lailaisay for the Rust lailaisay.app) is a
+separate product name and application bundle from Hex.
+
+Some Dictate polish behaviors were inspired by public open-source input-method
+projects (including patterns discussed in-repo as typefree-inspired). lailaisay is
+not affiliated with Typeless and is not an official Typeless product.
+
+Third-party runtimes and services used by lailaisay — including whisper.cpp, egui,
+Ollama, and optional cloud APIs — remain under their own licenses and terms of
+service. This NOTICE is not an exhaustive dependency list.

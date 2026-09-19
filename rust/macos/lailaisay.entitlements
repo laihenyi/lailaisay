@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Developer ID / outside-Mac-App-Store entitlements for lailaisay.app
+  (bundle id com.yikai.lailaisay).
+
+  Used with Hardened Runtime (codesign options runtime and timestamp).
+  Required for Apple notarization of a Developer ID Application signature.
+
+  App Sandbox (com.apple.security.app-sandbox) is intentionally omitted.
+  This is a menu-bar dictation utility that must:
+
+    1. Install a global CGEvent tap so the hold-to-talk hotkey works in other
+       apps (Accessibility / Input Monitoring TCC, not available to a typical
+       sandboxed Mac App Store app).
+    2. Paste into the previously frontmost app via Accessibility (AX insert),
+       CGEvent Cmd-V, and Automation of System Events (osascript).
+    3. Read and write the existing user data locations (Documents settings
+       files and Application Support/com.yikai.lailaisay/models).
+
+  Sandbox would block those without temporary-exception entitlements Apple
+  does not grant for this class of utility. Hardened Runtime still applies:
+  library validation, no unsigned executable memory, and no get-task-allow.
+
+  Accessibility and Input Monitoring are TCC prompts (Info.plist usage
+  strings), not Hardened Runtime keys. Do not add get-task-allow here;
+  that entitlement is for local debugging and fails notarization.
+-->
+<plist version="1.0">
+<dict>
+	<!-- Microphone: cpal / Core Audio capture for press-and-hold dictation. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<!-- Apple Events: System Events Automation used by lailaisay-paste. -->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+</dict>
+</plist>

@@ -1,0 +1,18 @@
+[package]
+name = "lailaisay-input"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Global hotkey capture (macOS CGEvent tap; Windows WH_KEYBOARD_LL; stub elsewhere)"
+
+[dependencies]
+lailaisay-core.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc = "0.2"
+
+# objc 0.2 macros emit this legacy conditional in the consuming crate.
+# Register only that known value; other unexpected cfg values remain warnings.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }
