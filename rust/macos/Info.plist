@@ -19,28 +19,28 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
 	<key>LSUIElement</key>
-	<true/>
-	<key>NSHumanReadableCopyright</key>
-	<string>© 2026 Henyi Lai. MIT License.</string>
-	<key>NSHighResolutionCapable</key>
-	<true/>
-	<key>NSSupportsAutomaticGraphicsSwitching</key>
 	<true/>
 	<key>NSAccessibilityUsageDescription</key>
 	<string>lailaisay needs Accessibility to watch the hold-to-talk hotkey and paste transcribed text into the app you were using.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>lailaisay needs Automation to paste transcribed text into the app that was frontmost when you pressed the hotkey.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>© 2026 Henyi Lai. MIT License.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>lailaisay needs microphone access to record and transcribe your speech.</string>
+	<key>NSSupportsAutomaticGraphicsSwitching</key>
+	<true/>
 </dict>
 </plist>
