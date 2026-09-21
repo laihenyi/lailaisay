@@ -57,16 +57,16 @@ Mac App Store 審核強制要求 App Sandbox。Developer ID 版（`macos/lailais
 
 | 素材 | 規格 | 狀態 |
 | --- | --- | --- |
-| App 名稱 | ≤30 字，`lailaisay` | 待填 |
-| 副標題 | ≤30 字 | 待撰寫 |
-| 說明 | ≤4000 字，zh-Hant（可加 en-US）；需說明 App Store 版是「複製到剪貼簿後 ⌘V」 | 待撰寫 |
-| 關鍵字 | ≤100 字，逗號分隔 | 待撰寫 |
-| 促銷文字 | ≤170 字，選填 | 選填 |
-| 此版本新增功能 | 首版可寫「首次發布」 | 待填 |
-| 螢幕截圖 | 至少 1 張；1280×800、1440×900、2560×1600、2880×1800 擇一；建議 3 到 5 張（設定視窗、錄音 HUD、複製結果） | ❌ 無 |
+| App 名稱 | ≤30 字，`lailaisay` | ✅ `fastlane/metadata/*/name.txt` |
+| 副標題 | ≤30 字 | ✅ zh-Hant「按住說話，語音變文字」、en-US |
+| 說明 | ≤4000 字，zh-Hant + en-US；已說明「複製到剪貼簿後 ⌘V」 | ✅ `fastlane/metadata/*/description.txt` |
+| 關鍵字 | ≤100 字，逗號分隔 | ✅ |
+| 促銷文字 | ≤170 字，選填 | ✅ |
+| 此版本新增功能 | 首版「首次發布」 | ✅ |
+| 螢幕截圖 | 1440×900，5 張（一般、語音模型、自訂辭典、AI 潤稿、錄音 HUD） | ✅ `fastlane/screenshots/zh-Hant/`；第 5 張的備忘錄文字為示意，HUD 為實際擷取 |
 | App 預覽影片 | 選填 | 選填 |
-| 支援網址 | 必填，可用 GitHub repo 或 issues 頁 | 待決定 |
-| 行銷網址 | 選填 | 選填 |
+| 支援網址 | 必填 | ✅ https://github.com/laihenyi/lailaisay（repo 目前關閉 Issues，建議開啟或在 README 加聯絡方式） |
+| 行銷網址 | 選填 | ✅ 同上 |
 | 隱私權政策網址 | **必填**；須說明麥克風錄音只在本機處理，選用的 Groq/Gemini 會把文字送到第三方 | ❌ 無 |
 | App 隱私（Nutrition Label） | 麥克風音訊不收集、不離開裝置；啟用 Groq/Gemini 時使用者內容會傳給第三方 | 待填 |
 | 年齡分級 | 問卷，預期 4+ | 待填 |
@@ -76,7 +76,7 @@ Mac App Store 審核強制要求 App Sandbox。Developer ID 版（`macos/lailais
 | 審核備註 | 操作步驟（按住 ⌘⇧Space → 說話 → 放開 → ⌘V）；首次啟動需下載 Whisper 模型（約 75MB 起）；不需登入 | 待撰寫 |
 | 第三方授權 | whisper.cpp（MIT）、Hex（MIT）、內嵌字型（OFL）已在 `LICENSE`/`NOTICE`/`FONT-LICENSE.txt` | ✅ |
 
-fastlane metadata 目錄結構（`fastlane mac release` 讀取，尚未建立）：
+fastlane metadata 目錄結構（`fastlane mac release` 讀取）。截圖重製：開啟設定視窗後用 `screencapture -l <windowID>` 擷取各分頁，再用 PIL 合成 1440×900 背景與標題。
 
 ```
 rust/fastlane/metadata/zh-Hant/

@@ -1,0 +1,1 @@
+Hold a hotkey, speak, release. Offline Whisper transcription tuned for Traditional Chinese.

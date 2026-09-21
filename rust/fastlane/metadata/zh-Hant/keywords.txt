@@ -1,0 +1,1 @@
+語音輸入,語音轉文字,聽寫,口述,Whisper,離線,繁體中文,速記,逐字稿,dictation,speech to text

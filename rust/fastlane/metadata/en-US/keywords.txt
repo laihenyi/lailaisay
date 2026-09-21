@@ -1,0 +1,1 @@
+dictation,speech to text,voice typing,whisper,offline,transcribe,chinese,voice input,notes
