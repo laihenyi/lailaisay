@@ -30,14 +30,14 @@ Mac App Store 審核強制要求 App Sandbox。Developer ID 版（`macos/lailais
 | Bundle ID `com.yikai.lailaisay`（Developer Portal 資源 `2F889GYMND`，platform UNIVERSAL） | ✅ 2026-09-21 註冊 |
 | Provisioning Profile「lailaisay Mac App Store」（`KBMFVU6T89`，MAC_APP_STORE，效期至 2027/07/21） | ✅ 已下載為 `macos/lailaisay-appstore.provisionprofile`（可提交，非機密） |
 | App Store Connect API Key | ✅ Key ID `7AXGRN3B24`、Issuer `69a6de7f-8267-47e3-e053-5b8c7c11a4d1`，私鑰 `AuthKey_7AXGRN3B24.p8` 放在 repo 根目錄（`.gitignore` 與 CI 都會擋下） |
-| App Store Connect 的 App 紀錄 | ❌ **尚未建立**（API 不支援建立 App，需在網頁操作，見 §2） |
+| App Store Connect 的 App 紀錄 | ✅ 2026-09-21 建立：App ID `6814312066`、名稱 lailaisay、SKU `lailaisay-macos`、主要語言 zh-Hant，https://appstoreconnect.apple.com/apps/6814312066 |
 
 憑證備份：`~/Desktop/iOS_Certificates_Backup/mac_installer_2026.{key,cer,p12}`，p12 密碼與該資料夾既有備份相同（見 `PilotApp_Flutter_Standalone/docs/ios_certificate_info.md`）。請把該資料夾備份到安全位置。
 
 ## 2. App Store Connect 需手動完成
 
-1. https://appstoreconnect.apple.com → 我的 App → ＋ → 新增 App：平台 macOS、名稱 `lailaisay`、主要語言 繁體中文、Bundle ID 選 `lailaisay (com.yikai.lailaisay)`、SKU 自訂（例如 `lailaisay-macos`）。
-2. 建好後 `fastlane mac check_version` 才能查到 App。
+1. ✅ App 紀錄已建立（App ID `6814312066`）。建立時「使用者存取權限：完整存取權限」未能儲存，若有其他團隊成員需要存取，到 App 資訊頁再設定。
+2. ⚠️ App Store Connect 首頁提示《Apple Developer Program 許可協議》已更新，需由「帳號持有人」在 https://developer.apple.com/account 接受，否則無法提交新 build 送審。
 
 ## 3. 建置設定狀態
 
