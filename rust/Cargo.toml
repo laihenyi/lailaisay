@@ -42,3 +42,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 zhconv = "0.3"
+
+# winit 0.30.13 with the private CGSSetWindowBackgroundBlurRadius /
+# CGSMainConnectionID calls removed; Mac App Store review rejects binaries
+# that reference them. See vendor/winit/src/platform_impl/macos/ffi.rs.
+[patch.crates-io]
+winit = { path = "vendor/winit" }

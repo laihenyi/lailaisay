@@ -78,6 +78,7 @@ platform :mac do
       metadata_path: "./fastlane/metadata",
       screenshots_path: "./fastlane/screenshots",
       skip_screenshots: !Dir.exist?(File.join(__dir__, "screenshots")),
+      sync_screenshots: true, # checksum-based; avoids re-uploading duplicates on retry
       force: true,
       precheck_include_in_app_purchases: false,
       run_precheck_before_submit: false,

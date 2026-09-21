@@ -93,7 +93,9 @@ rust/fastlane/screenshots/zh-Hant/*.png
 
 | 日期 | 版本 | 動作 |
 | --- | --- | --- |
-| 2026-09-21 | 1.0 (1) | `fastlane mac release` 上傳 pkg + metadata + 截圖，`fastlane mac submit_review` 送審；狀態 WAITING_FOR_REVIEW，手動發佈 |
+| 2026-09-21 | 1.0 (1) | `fastlane mac release` 上傳 pkg + metadata + 截圖，`fastlane mac submit_review` 送審 |
+| 2026-09-22 | 1.0 (1) | **被拒**：二進位引用私有 API `_CGSSetWindowBackgroundBlurRadius`（來自 winit 0.30.13 `set_blur`）。修法：`vendor/winit` 移除該 FFI 與呼叫，`Cargo.toml` `[patch.crates-io]` 覆蓋 |
+| 2026-09-22 | 1.0 (2) | 以修正後的 winit 重新打包、`fastlane mac beta` 上傳 build 2、`submit_review` 重送 |
 
 ### 5.4 之後每次更新的標準流程
 
@@ -105,6 +107,8 @@ rust/fastlane/screenshots/zh-Hant/*.png
 6. 等 build 狀態變 VALID（API `/v1/builds?filter[app]=6814312066`，通常 1–5 分鐘），再 `fastlane mac submit_review`。
 7. 審核通過後因設定為手動發佈，需到 App Store Connect 版本頁按「發佈此版本」，或改 Fastfile `automatic_release: true`。
 8. 提交 `macos/Info.plist`、metadata 的變更到 git。
+
+送審前檢查私有 API：`nm -u dist/lailaisay.app/Contents/MacOS/lailaisay-app | grep -E 'CGS|SLS'` 應為空（`CGShieldingWindowLevel` 是公開 API，可忽略）。升級 eframe/winit 時要重新套用 `vendor/winit` 的修改。
 
 備註：`fastlane precheck` 不支援 macOS，lanes 已設 `run_precheck_before_submit: false`。`review_information/phone_number.txt` 為 git-ignored 本機檔，換機器要重建。
 
