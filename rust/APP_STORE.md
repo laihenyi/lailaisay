@@ -18,7 +18,7 @@ Mac App Store 審核強制要求 App Sandbox。Developer ID 版（`macos/lailais
 
 已驗證（2026-09-21，本機 Apple Silicon）：`--app-store` 打包成功、`codesign` 含 sandbox entitlement、`pkgutil --check-signature` 通過；以 `open dist/lailaisay.app` 啟動後程序存活、`hex_settings.json` 寫入容器 `Data/Documents`、stderr 出現「Carbon hotkey registered (⌘⇧SPACE)」。預設字典改為編譯進二進位（原本從 repo 路徑讀取，沙盒下會 EPERM）。
 
-尚待實機驗證：按住 ⌘⇧Space 說話放開後是否出現「已複製」並可 ⌘V、模型下載是否落在容器內、`rfd` 開檔面板匯入字典。注意：從終端機直接執行沙盒版二進位不會重設 `HOME`，會因存取 `~/Documents` 失敗而退出；請用 `open dist/lailaisay.app` 測試。`--once` 需讀 repo 內的 fixture，沙盒版不適用。
+已實機驗證（2026-09-21）：Carbon 熱鍵 ⌘⇧Space 按住說話可用。尚待驗證：模型下載是否落在容器內、`rfd` 開檔面板匯入字典。注意：從終端機直接執行沙盒版二進位不會重設 `HOME`，會因存取 `~/Documents` 失敗而退出；請用 `open dist/lailaisay.app` 測試。`--once` 需讀 repo 內的 fixture，沙盒版不適用。
 
 ## 1. 憑證與 Developer Portal 狀態（2026-09-21）
 
