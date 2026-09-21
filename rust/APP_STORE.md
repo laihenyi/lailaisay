@@ -73,7 +73,7 @@ Mac App Store 審核強制要求 App Sandbox。Developer ID 版（`macos/lailais
 | 版權 | `© 2026 Henyi Lai`（`metadata/copyright.txt`，隨 `fastlane mac release` 上傳） | ✅ |
 | 類別 | 主要：生產力工具；次要：工具程式；副標題「按住說話，語音變文字」；內容版權：不含第三方內容 | ✅ 2026-09-21 App 資訊已儲存 |
 | 價格與供應範圍 | 免費（USD 0.00，175 個國家或地區，App 發佈時供應） | ✅ 2026-09-21 |
-| 審核備註 | `metadata/review_information/notes.txt`（操作步驟、模型下載、沙盒授權說明、不需登入）；聯絡人 Henyi Lai / james@pilot.game.tw | ⚠️ 已填入版本 1.0 頁面但**聯絡電話為必填**，需在 App Store Connect 補上後按「儲存」；也請補 `review_information/phone_number.txt` |
+| 審核備註 | `metadata/review_information/notes.txt`（操作步驟、模型下載、沙盒授權說明、不需登入）；聯絡人 Henyi Lai / james@pilot.game.tw | ✅ 2026-09-21 已儲存於版本 1.0 頁面（含聯絡電話）。repo 為公開，`review_information/phone_number.txt` 刻意不提交；`fastlane mac release` 不會覆蓋網頁上已填的電話 |
 | 第三方授權 | whisper.cpp（MIT）、Hex（MIT）、內嵌字型（OFL）已在 `LICENSE`/`NOTICE`/`FONT-LICENSE.txt` | ✅ |
 
 fastlane metadata 目錄結構（`fastlane mac release` 讀取）。截圖重製：開啟設定視窗後用 `screencapture -l <windowID>` 擷取各分頁，再用 PIL 合成 1440×900 背景與標題。
