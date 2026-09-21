@@ -67,7 +67,7 @@ Mac App Store 審核強制要求 App Sandbox。Developer ID 版（`macos/lailais
 | App 預覽影片 | 選填 | 選填 |
 | 支援網址 | 必填 | ✅ https://github.com/laihenyi/lailaisay（repo 目前關閉 Issues，建議開啟或在 README 加聯絡方式） |
 | 行銷網址 | 選填 | ✅ 同上 |
-| 隱私權政策網址 | **必填**；須說明麥克風錄音只在本機處理，選用的 Groq/Gemini 會把文字送到第三方 | ❌ 無 |
+| 隱私權政策網址 | **必填**；須說明麥克風錄音只在本機處理，選用的 Groq/Gemini 會把文字送到第三方 | ✅ `PRIVACY.md`（中英對照），`fastlane/metadata/*/privacy_url.txt` 指向 https://github.com/laihenyi/lailaisay/blob/main/PRIVACY.md；需先 push 到 GitHub 才可公開存取 |
 | App 隱私（Nutrition Label） | 麥克風音訊不收集、不離開裝置；啟用 Groq/Gemini 時使用者內容會傳給第三方 | 待填 |
 | 年齡分級 | 問卷，預期 4+ | 待填 |
 | 版權 | `© 2026 Henyi Lai` | 待填 |
