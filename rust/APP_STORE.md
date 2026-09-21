@@ -47,7 +47,7 @@ Mac App Store 審核強制要求 App Sandbox。Developer ID 版（`macos/lailais
 | `macos/lailaisay-appstore.entitlements` | ✅ |
 | `macos/lailaisay-appstore.provisionprofile` | ✅ |
 | `Info.plist` `ITSAppUsesNonExemptEncryption = false`、`NSHumanReadableCopyright` | ✅ |
-| `Info.plist` `CFBundleVersion` | 每次上傳必須遞增；`fastlane mac check_version` 會比對 |
+| `Info.plist` `CFBundleShortVersionString` / `CFBundleVersion` | 目前 1.0 / 1（已上傳）；每次上傳 `CFBundleVersion` 必須遞增，`fastlane mac check_version` 會比對 |
 | `scripts/package-macos-app.sh --app-store` | ✅ 建置 → 嵌入 profile → 沙盒簽署 → `productbuild` → `dist/lailaisay.pkg` |
 | `fastlane/Fastfile`（`mac` 平台 lanes） | ✅ |
 | 1024×1024 圖示 | ✅ `AppIcon.icns` 內含；App Store Connect 另需上傳同一張 1024×1024 PNG（無 alpha） |
@@ -88,6 +88,26 @@ rust/fastlane/screenshots/zh-Hant/*.png
 ```
 
 ## 5. 上架流程
+
+### 5.0 歷程
+
+| 日期 | 版本 | 動作 |
+| --- | --- | --- |
+| 2026-09-21 | 1.0 (1) | `fastlane mac release` 上傳 pkg + metadata + 截圖，`fastlane mac submit_review` 送審；狀態 WAITING_FOR_REVIEW，手動發佈 |
+
+### 5.4 之後每次更新的標準流程
+
+1. 改碼、測試（`cargo test --workspace --features lailaisay-stt/process-whisper`，並以 `--features appstore` 重跑 app/paste crate 測試）。
+2. 版本號：`macos/Info.plist` 的 `CFBundleShortVersionString` 改為新行銷版本（例 `1.1`），`CFBundleVersion` 遞增（每次上傳都要比 App Store Connect 上最新的大）。
+3. App Store Connect 若沒有該行銷版本的紀錄，`fastlane mac release` 會自動建立；`metadata/*/release_notes.txt` 改成本版新增功能。
+4. `./scripts/package-macos-app.sh --app-store` → `dist/lailaisay.pkg`。
+5. `fastlane mac release`（上傳 pkg + metadata + 截圖；截圖沒變也會重傳）。若截圖重複，用 API 刪除同檔名的重複項後再送審。
+6. 等 build 狀態變 VALID（API `/v1/builds?filter[app]=6814312066`，通常 1–5 分鐘），再 `fastlane mac submit_review`。
+7. 審核通過後因設定為手動發佈，需到 App Store Connect 版本頁按「發佈此版本」，或改 Fastfile `automatic_release: true`。
+8. 提交 `macos/Info.plist`、metadata 的變更到 git。
+
+備註：`fastlane precheck` 不支援 macOS，lanes 已設 `run_precheck_before_submit: false`。`review_information/phone_number.txt` 為 git-ignored 本機檔，換機器要重建。
+
 
 ### 5.1 打包（建置 + 簽署 + pkg）
 
