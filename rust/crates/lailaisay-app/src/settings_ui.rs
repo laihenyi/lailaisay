@@ -1179,11 +1179,6 @@ impl SettingsForm {
         if !self.permissions_open_message.is_empty() {
             danger_note(ui, &self.permissions_open_message);
         }
-        ui.add_space(8.0);
-        warn_note(
-            ui,
-            "若仍用 cargo run，系統記的是 Terminal／Cursor。打包後請改授權 lailaisay.app。",
-        );
     }
 
     fn show_footer(&mut self, ui: &mut Ui) -> FormAction {
@@ -1683,10 +1678,6 @@ fn show_readonly_block(ui: &mut Ui, text: &str, hint: &str) {
             .hint_text(hint)
             .font(FontId::proportional(13.0)),
     );
-}
-
-fn warn_note(ui: &mut Ui, text: &str) {
-    ui.add(egui::Label::new(egui::RichText::new(text).size(12.5).color(WARN)).wrap());
 }
 
 fn success_note(ui: &mut Ui, text: &str) {

@@ -63,7 +63,7 @@ Mac App Store 審核強制要求 App Sandbox。Developer ID 版（`macos/lailais
 | 關鍵字 | ≤100 字，逗號分隔 | ✅ |
 | 促銷文字 | ≤170 字，選填 | ✅ |
 | 此版本新增功能 | 首版「首次發布」 | ✅ |
-| 螢幕截圖 | 1440×900，5 張（一般、語音模型、自訂辭典、AI 潤稿、錄音 HUD） | ✅ `fastlane/screenshots/zh-Hant/`；第 5 張的備忘錄文字為示意，HUD 為實際擷取 |
+| 螢幕截圖 | 1440×900，5 張（一般、語音模型、自訂辭典、AI 潤稿、錄音 HUD） | ✅ `fastlane/screenshots/zh-Hant/`（2026-09-21 自 `--app-store` 沙盒版重新擷取，熱鍵顯示 ⌘⇧Space）；第 5 張的備忘錄文字為示意，HUD 為實際擷取 |
 | App 預覽影片 | 選填 | 選填 |
 | 支援網址 | 必填 | ✅ https://github.com/laihenyi/lailaisay（repo 目前關閉 Issues，建議開啟或在 README 加聯絡方式） |
 | 行銷網址 | 選填 | ✅ 同上 |
