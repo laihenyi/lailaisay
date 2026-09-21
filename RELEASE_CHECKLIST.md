@@ -18,6 +18,7 @@ The maintained branch is `main`. The repository has a new Rust-only root history
 - [ ] Choose distribution channel and release version. Store acceptance has not been established by these tests.
 - [ ] Configure and verify Windows signing. The Windows setup is unsigned.
 - [ ] macOS outside-App-Store distribution: package (`rust/scripts/package-macos-app.sh`), then Developer ID + notarize (`rust/scripts/notarize-macos.sh` with `CODESIGN_IDENTITY` / App Store Connect API key env or `NOTARYTOOL_PROFILE`). Verify `spctl --assess --type execute -vv dist/lailaisay.app` and `xcrun stapler validate dist/lailaisay.app`. Do not commit `.p8` keys or issuer secrets. Local packages without that step remain ad-hoc signed. See [rust/MAC_SMOKE.md](rust/MAC_SMOKE.md#outside-app-store-developer-id--notarization).
+- [ ] Mac App Store channel (optional): build with `rust/scripts/package-macos-app.sh --app-store`, create the App Store Connect app record, prepare screenshots / privacy policy URL / metadata, then `fastlane mac beta` → `release` → `submit_review`. See [rust/APP_STORE.md](rust/APP_STORE.md).
 - [ ] Review privacy disclosures, third-party licenses and release notes for the selected channel.
 - [ ] Publish durable release assets with checksums. CI artifacts expire after 14 days.
 

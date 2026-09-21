@@ -122,6 +122,12 @@ pub fn keycode_to_key(code: u16) -> Option<Key> {
     })
 }
 
+/// Inverse of [`keycode_to_key`]: the Carbon / Quartz virtual keycode for a
+/// [`Key`]. Used by the sandbox-safe `RegisterEventHotKey` monitor.
+pub fn key_to_keycode(key: &Key) -> Option<u16> {
+    (0u16..=53).find(|code| keycode_to_key(*code).as_ref() == Some(key))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -132,6 +138,18 @@ mod tests {
         assert_eq!(keycode_to_key(53), Some(Key::Escape));
         assert_eq!(keycode_to_key(0), Some(Key::A));
         assert_eq!(keycode_to_key(55), None); // command key
+    }
+
+    #[test]
+    fn key_to_keycode_round_trips() {
+        assert_eq!(key_to_keycode(&Key::Space), Some(49));
+        assert_eq!(key_to_keycode(&Key::Escape), Some(53));
+        assert_eq!(key_to_keycode(&Key::A), Some(0));
+        for code in 0u16..=53 {
+            if let Some(key) = keycode_to_key(code) {
+                assert_eq!(key_to_keycode(&key), Some(code), "{key:?}");
+            }
+        }
     }
 
     #[test]

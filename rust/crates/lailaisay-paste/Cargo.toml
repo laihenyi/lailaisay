@@ -5,6 +5,12 @@ edition.workspace = true
 license.workspace = true
 description = "Clipboard copy; macOS AX paste; Windows SendInput Ctrl+V"
 
+[features]
+default = []
+# Mac App Store sandbox: clipboard only. No AX insert, CGEvent Cmd-V, or
+# System Events (Apple Events) — the sandbox blocks all of them.
+appstore = []
+
 [dependencies]
 lailaisay-core.workspace = true
 arboard.workspace = true

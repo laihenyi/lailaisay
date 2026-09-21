@@ -18,6 +18,10 @@ macOS packaging is Apple Silicon (arm64) only. Intel Mac / Rosetta / `x86_64-app
 
 `--layout-only` creates a non-runnable stub for packaging validation. `--skip-build` reuses an existing release binary. `TOK_APP_BIN` selects a specific prebuilt binary and `TOK_CARGO_TARGET` selects a target triple (Intel Mac triples are rejected). `--zip` creates `dist/lailaisay.app.zip`. `--developer-id` signs with `CODESIGN_IDENTITY` (Hardened Runtime + `macos/lailaisay.entitlements`) and does not notarize.
 
+## Mac App Store
+
+The App Store build is a separate, sandboxed variant (`cargo --features appstore`, Carbon hotkey, clipboard-only output). Packaging, certificates and upload are in [APP_STORE.md](APP_STORE.md). Everything below is the outside-App-Store product.
+
 ## Outside App Store: Developer ID + notarization
 
 Distribute `lailaisay.app` outside the Mac App Store with a **Developer ID Application** signature and Apple notarization. Team ID `S6EDV86VSB`. Default identity: `Developer ID Application: Henyi Lai (S6EDV86VSB)`.

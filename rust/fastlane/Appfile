@@ -1,0 +1,5 @@
+# lailaisay — Mac App Store
+app_identifier "com.yikai.lailaisay"
+apple_id "james@pilot.game.tw"
+team_id "S6EDV86VSB"
+# Authentication uses the App Store Connect API key (see Fastfile), not the Apple ID password.

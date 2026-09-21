@@ -28,3 +28,11 @@ AuthKey_*.p8
 *.dSYM
 DerivedData/
 *.xcresult
+
+# Local Claude Code guidance
+CLAUDE.md
+
+# fastlane run artifacts
+rust/fastlane/report.xml
+rust/fastlane/README.md
+rust/fastlane/Preview.html

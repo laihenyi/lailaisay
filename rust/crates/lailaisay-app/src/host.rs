@@ -34,11 +34,18 @@ use crate::desktop::{build_tray, status_icon};
 use crate::macos_runtime::{apply_activation_policy, workspace_frontmost};
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use lailaisay_core::HotKeyProcessor;
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", not(feature = "appstore")))]
 use lailaisay_input::{MacOsEventTap, ACCESSIBILITY_HELP, MICROPHONE_HELP};
+#[cfg(all(target_os = "macos", feature = "appstore"))]
+use lailaisay_input::{MacOsCarbonHotkey, MICROPHONE_HELP};
+/// Global hotkey source on macOS: CGEvent tap, or Carbon hot keys in the sandboxed App Store build.
+#[cfg(all(target_os = "macos", not(feature = "appstore")))]
+type MacHotkeySource = MacOsEventTap;
+#[cfg(all(target_os = "macos", feature = "appstore"))]
+type MacHotkeySource = MacOsCarbonHotkey;
 #[cfg(target_os = "windows")]
 use lailaisay_input::{WindowsEventTap, WINDOWS_HOTKEY_HELP, WINDOWS_MICROPHONE_HELP};
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", not(feature = "appstore")))]
 use lailaisay_paste::PASTE_TCC_HELP;
 #[cfg(target_os = "windows")]
 use lailaisay_paste::WINDOWS_PASTE_HELP;
@@ -85,9 +92,14 @@ pub fn run_with(opts: RuntimeOpts) -> Result<()> {
             "lailaisay menu-bar (Rust). Bundle id: {}",
             lailaisay_core::MACOS_BUNDLE_ID
         );
-        eprintln!("{ACCESSIBILITY_HELP}");
+        #[cfg(not(feature = "appstore"))]
+        {
+            eprintln!("{ACCESSIBILITY_HELP}");
+            eprintln!("{PASTE_TCC_HELP}");
+        }
         eprintln!("{MICROPHONE_HELP}");
-        eprintln!("{PASTE_TCC_HELP}");
+        #[cfg(feature = "appstore")]
+        eprintln!("[lailaisay-app] App Store build: Carbon hotkey, clipboard output (Cmd+V to paste).");
     }
     #[cfg(target_os = "windows")]
     {
@@ -160,7 +172,7 @@ struct LailaisayHost {
     #[cfg(feature = "mic")]
     live: Option<lailaisay_stt::record::LiveRecorder>,
     #[cfg(target_os = "macos")]
-    tap: Option<MacOsEventTap>,
+    tap: Option<MacHotkeySource>,
     #[cfg(target_os = "windows")]
     tap: Option<WindowsEventTap>,
     #[cfg(any(target_os = "macos", target_os = "windows"))]
@@ -489,9 +501,18 @@ impl LailaisayHost {
                 }
                 #[cfg(any(target_os = "macos", target_os = "windows"))]
                 {
-                    if let Some(tap) = self.tap.as_ref() {
+                    if let Some(tap) = self.tap.as_mut() {
                         tap.set_hotkey(settings.hotkey.clone(), settings.use_double_tap_only);
                         tap.set_edit_hotkey(settings.edit_hotkey.clone());
+                    }
+                }
+                #[cfg(all(target_os = "macos", feature = "appstore"))]
+                {
+                    if let Some(err) = self.tap.as_ref().and_then(|t| t.last_error()) {
+                        self.form.save_message = format!("已儲存設定，但熱鍵未生效：{err}");
+                        set_shared_status(&self.shared, "hotkey unavailable");
+                        self.form.mark_clean();
+                        return;
                     }
                 }
                 if model_changed {
@@ -779,6 +800,7 @@ impl LailaisayHost {
                     g.settings.use_double_tap_only,
                 )
             };
+            #[cfg(not(feature = "appstore"))]
             match MacOsEventTap::with_processor(HotKeyProcessor::new(hotkey.clone(), double_tap)) {
                 Ok(t) => {
                     t.set_hotkey(hotkey, double_tap);
@@ -795,6 +817,33 @@ impl LailaisayHost {
                         "[lailaisay-app] tray stays up. Grant Accessibility + Input Monitoring, then Quit and relaunch."
                     );
                     set_shared_status(&self.shared, "needs Accessibility");
+                }
+            }
+            #[cfg(feature = "appstore")]
+            match MacOsCarbonHotkey::with_processor(HotKeyProcessor::new(
+                hotkey.clone(),
+                double_tap,
+            )) {
+                Ok(mut t) => {
+                    t.set_hotkey(hotkey.clone(), double_tap);
+                    t.set_edit_hotkey(edit_hotkey);
+                    match t.last_error() {
+                        None => {
+                            set_shared_status(&self.shared, "idle");
+                            eprintln!(
+                                "[lailaisay-app] Carbon hotkey registered ({hotkey}); sandbox build, clipboard output."
+                            );
+                        }
+                        Some(err) => {
+                            eprintln!("[lailaisay-app] Carbon hotkey not registered: {err}");
+                            set_shared_status(&self.shared, "hotkey unavailable");
+                        }
+                    }
+                    self.tap = Some(t);
+                }
+                Err(e) => {
+                    eprintln!("[lailaisay-app] Carbon hotkey handler failed: {e}");
+                    set_shared_status(&self.shared, "hotkey unavailable");
                 }
             }
         } else {

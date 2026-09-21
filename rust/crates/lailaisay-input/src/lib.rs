@@ -6,6 +6,8 @@
 //! - **macOS:** HID `CGEventTap`.
 //!   Requires Accessibility (and sometimes Input Monitoring). See
 //!   [`permissions::ACCESSIBILITY_HELP`].
+//! - **macOS App Store (sandbox):** [`MacOsCarbonHotkey`] — Carbon
+//!   `RegisterEventHotKey`, no TCC prompt, chord must include a key.
 //! - **Windows:** [`WindowsEventTap`] — `WH_KEYBOARD_LL` on a message-pump
 //!   thread, same [`TapMessage`] channel as macOS. See
 //!   [`permissions::WINDOWS_HOTKEY_HELP`].
@@ -27,6 +29,8 @@ pub mod swallow;
 pub mod tap;
 pub mod vk;
 
+#[cfg(target_os = "macos")]
+pub mod carbon;
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "macos")]
@@ -51,6 +55,8 @@ pub use vk::{
     WinEventKind,
 };
 
+#[cfg(target_os = "macos")]
+pub use carbon::{carbon_hotkey_supported, MacOsCarbonHotkey};
 #[cfg(target_os = "macos")]
 pub use macos::MacOsEventTap;
 #[cfg(target_os = "windows")]

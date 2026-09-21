@@ -154,7 +154,12 @@ pub struct DictionaryMergeStats {
 impl CustomWordDictionary {
     pub fn load_path(path: &Path) -> Result<Self, LailaisayError> {
         let data = std::fs::read(path)?;
-        let mut dict: Self = serde_json::from_slice(&data)?;
+        Self::from_json_bytes(&data)
+    }
+
+    /// Parse dictionary JSON (file contents or the embedded default).
+    pub fn from_json_bytes(data: &[u8]) -> Result<Self, LailaisayError> {
+        let mut dict: Self = serde_json::from_slice(data)?;
         dict.drop_unsafe_replacements();
         Ok(dict)
     }

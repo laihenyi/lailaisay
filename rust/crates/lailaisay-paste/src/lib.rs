@@ -15,9 +15,9 @@ use thiserror::Error;
 pub mod strategy;
 pub mod windows_keys;
 
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", not(feature = "appstore")))]
 mod macos;
-#[cfg(target_os = "windows")]
+#[cfg(all(target_os = "windows", not(feature = "appstore")))]
 mod windows;
 
 pub use strategy::{
@@ -59,11 +59,11 @@ pub fn copy_text(text: &str) -> Result<()> {
 
 /// Read the focused field's selected text (macOS AX). `Ok(None)` if empty / unavailable.
 pub fn read_selected_text() -> Result<Option<String>> {
-    #[cfg(target_os = "macos")]
+    #[cfg(all(target_os = "macos", not(feature = "appstore")))]
     {
         return macos::read_selected_text();
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(all(target_os = "macos", not(feature = "appstore"))))]
     {
         Ok(None)
     }
@@ -72,15 +72,17 @@ pub fn read_selected_text() -> Result<Option<String>> {
 /// Frontmost bundle + AX field snapshot (macOS) or HWND + exe (Windows).
 /// Call at hotkey-down, not after STT/LLM.
 pub fn capture_frontmost_target() -> Option<PasteTarget> {
-    #[cfg(target_os = "macos")]
+    // App Store build: no System Events / AX. The host fills the bundle id
+    // from NSWorkspace instead.
+    #[cfg(all(target_os = "macos", not(feature = "appstore")))]
     {
         return macos::capture_frontmost_target();
     }
-    #[cfg(target_os = "windows")]
+    #[cfg(all(target_os = "windows", not(feature = "appstore")))]
     {
         return windows::capture_frontmost_target();
     }
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[cfg(not(all(any(target_os = "macos", target_os = "windows"), not(feature = "appstore"))))]
     {
         None
     }
@@ -96,7 +98,7 @@ pub fn replace_selected_text_to(
     settings: &LailaisaySettings,
     target: Option<&PasteTarget>,
 ) -> Result<()> {
-    #[cfg(target_os = "macos")]
+    #[cfg(all(target_os = "macos", not(feature = "appstore")))]
     {
         if let Some(t) = target {
             macos::activate_target(t);
@@ -128,12 +130,23 @@ pub fn paste_text_to(
         copy_text(text)?;
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(feature = "appstore")]
+    {
+        // Sandbox: the clipboard is the only channel. Report copy-only so the
+        // host can tell the user to press Cmd-V.
+        let _ = target;
+        if !(settings.copy_to_clipboard || settings.use_clipboard_paste) {
+            copy_text(text)?;
+        }
+        return Err(PasteError::CopyOnlyFallback(APP_STORE_HOST));
+    }
+
+    #[cfg(all(target_os = "macos", not(feature = "appstore")))]
     {
         return macos::paste_into_target(text, settings, target);
     }
 
-    #[cfg(target_os = "windows")]
+    #[cfg(all(target_os = "windows", not(feature = "appstore")))]
     {
         if !settings.copy_to_clipboard {
             copy_text(text)?;
@@ -141,7 +154,7 @@ pub fn paste_text_to(
         return windows::paste_into_target(text, settings, target);
     }
 
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows", feature = "appstore")))]
     {
         let _ = target;
         if !settings.copy_to_clipboard {
@@ -151,8 +164,17 @@ pub fn paste_text_to(
     }
 }
 
+/// Host label reported by [`PasteError::CopyOnlyFallback`] in the App Store build.
+pub const APP_STORE_HOST: &str = "macOS App Store sandbox";
+
+/// True when this build can inject a paste into another app (not copy-only).
 pub fn paste_is_native() -> bool {
-    cfg!(any(target_os = "macos", target_os = "windows"))
+    cfg!(any(target_os = "macos", target_os = "windows")) && !cfg!(feature = "appstore")
+}
+
+/// True for the Mac App Store (sandbox) build: paste means copy + user Cmd-V.
+pub fn is_app_store_build() -> bool {
+    cfg!(feature = "appstore")
 }
 
 #[cfg(test)]
@@ -168,8 +190,22 @@ mod tests {
     fn paste_native_flag_matches_os() {
         assert_eq!(
             paste_is_native(),
-            cfg!(any(target_os = "macos", target_os = "windows"))
+            cfg!(any(target_os = "macos", target_os = "windows")) && !is_app_store_build()
         );
+        assert_eq!(is_app_store_build(), cfg!(feature = "appstore"));
+    }
+
+    #[cfg(feature = "appstore")]
+    #[test]
+    fn app_store_build_is_copy_only() {
+        let settings = LailaisaySettings::default();
+        assert!(read_selected_text().unwrap().is_none());
+        assert!(capture_frontmost_target().is_none());
+        match paste_text_to("lailaisay sandbox", &settings, None) {
+            Err(PasteError::CopyOnlyFallback(host)) => assert_eq!(host, APP_STORE_HOST),
+            Err(PasteError::Clipboard(_)) => {} // headless CI without a pasteboard
+            other => panic!("expected copy-only fallback, got {other:?}"),
+        }
     }
 
     #[test]

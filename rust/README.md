@@ -35,6 +35,7 @@ cargo run -p lailaisay-app --release --features whisper -- --once \
 
 - [macOS build and smoke checks](MAC_SMOKE.md)
 - [macOS Developer ID + notarization](MAC_SMOKE.md#outside-app-store-developer-id--notarization)
+- [Mac App Store (sandbox) variant, certificates and upload](APP_STORE.md) — `--features appstore`, `./scripts/package-macos-app.sh --app-store`, `fastlane mac …`
 - [Windows build, installer and diagnostics](WINDOWS.md)
 - [Release checklist](../RELEASE_CHECKLIST.md)
 

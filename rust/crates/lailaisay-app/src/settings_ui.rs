@@ -1167,6 +1167,11 @@ impl SettingsForm {
         }
         ui.add_space(6.0);
         for (pane, title, detail) in PRIVACY_ROWS {
+            // The sandboxed App Store build never asks for Accessibility,
+            // Input Monitoring or Automation; only the microphone applies.
+            if lailaisay_paste::is_app_store_build() && *pane != PrivacyPane::Microphone {
+                continue;
+            }
             if let Some(err) = perm_row(ui, title, detail, *pane) {
                 self.permissions_open_message = err;
             }
@@ -2075,6 +2080,10 @@ pub fn status_appearance(status: &str) -> (String, Color32) {
         ("潤稿中".into(), WARN)
     } else if s.contains("pasted") || s.contains("replaced") {
         ("已貼上".into(), SUCCESS)
+    } else if s.contains("copied") {
+        ("已複製".into(), SUCCESS)
+    } else if s.contains("hotkey unavailable") {
+        ("熱鍵未生效".into(), DANGER)
     } else if s.contains("hold longer") {
         ("請按久一點".into(), WARN)
     } else if s.contains("no speech") {
@@ -2105,6 +2114,10 @@ pub fn status_detail(status: &str, hold_label: &str, whisper_name: &str, ai_mode
         format!("Ollama · {ai_model}")
     } else if s.contains("pasted") || s.contains("replaced") {
         "已寫入目前輸入框".into()
+    } else if s.contains("copied") {
+        "已複製到剪貼簿，請在目標 App 按 ⌘V 貼上".into()
+    } else if s.contains("hotkey unavailable") {
+        "App Store 版熱鍵需包含修飾鍵與一個按鍵（例如 ⌘⇧Space），且未被其他 App 佔用".into()
     } else if s.contains("hold longer") {
         "按住熱鍵久一點再說話".into()
     } else if s.contains("no speech") {

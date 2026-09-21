@@ -11,6 +11,11 @@
 # notarize and does not require Apple's notary service. Follow with:
 #   ./scripts/notarize-macos.sh
 #
+# --app-store builds the sandboxed Mac App Store variant (cargo feature
+# `appstore`), embeds macos/lailaisay-appstore.provisionprofile, signs with the
+# Mac App Distribution identity and writes dist/lailaisay.pkg for upload
+# (fastlane mac beta / release). See APP_STORE.md.
+#
 # On Linux CI this script can validate the layout without linking whisper/mic:
 #   ./scripts/package-macos-app.sh --layout-only
 set -euo pipefail
@@ -24,9 +29,12 @@ LAYOUT_ONLY=0
 SKIP_BUILD=0
 ZIP=0
 DEVELOPER_ID=0
-FEATURES="${TOK_FEATURES:-mic,whisper}"
+APP_STORE=0
+FEATURES="${TOK_FEATURES:-}"
 CARGO_TARGET="${TOK_CARGO_TARGET:-}"
 DEFAULT_IDENTITY="Developer ID Application: Henyi Lai (S6EDV86VSB)"
+APPSTORE_APP_IDENTITY="${APPSTORE_APP_IDENTITY:-3rd Party Mac Developer Application: Henyi Lai (S6EDV86VSB)}"
+APPSTORE_INSTALLER_IDENTITY="${APPSTORE_INSTALLER_IDENTITY:-3rd Party Mac Developer Installer: Henyi Lai (S6EDV86VSB)}"
 
 reject_intel_mac_target() {
   local triple="${1:-}"
@@ -40,7 +48,7 @@ reject_intel_mac_target() {
 usage() {
   cat <<'EOF'
 Usage: package-macos-app.sh [--layout-only] [--skip-build] [--zip]
-                            [--target TRIPLE] [--developer-id]
+                            [--target TRIPLE] [--developer-id | --app-store]
 
   --layout-only   Assemble lailaisay.app with a stub executable (Linux CI / plist check).
   --skip-build    Reuse an existing lailaisay-app (host or --target dir, or TOK_APP_BIN).
@@ -50,14 +58,23 @@ Usage: package-macos-app.sh [--layout-only] [--skip-build] [--zip]
   --developer-id  Sign with CODESIGN_IDENTITY (Developer ID + Hardened Runtime
                   + macos/lailaisay.entitlements). Does not notarize and does
                   not contact notarytool. Follow with ./scripts/notarize-macos.sh.
+  --app-store     Mac App Store variant: cargo feature `appstore`, App Sandbox
+                  entitlements (macos/lailaisay-appstore.entitlements), embedded
+                  macos/lailaisay-appstore.provisionprofile, signed with the
+                  "3rd Party Mac Developer Application" identity, then
+                  productbuild → dist/lailaisay.pkg signed with the
+                  "3rd Party Mac Developer Installer" identity.
 
 macOS packaging is Apple Silicon only. Intel Mac / Rosetta is not supported.
 
 Environment:
-  TOK_FEATURES        Cargo features (default: mic,whisper). Ignored with --layout-only.
+  TOK_FEATURES        Cargo features (default: mic,whisper; with --app-store
+                      mic,whisper,appstore). Ignored with --layout-only.
   TOK_APP_BIN         Path to an already-built lailaisay-app binary.
   TOK_CARGO_TARGET    Default cargo target if --target is omitted.
   CODESIGN_IDENTITY   Required with --developer-id (Developer ID Application identity).
+  APPSTORE_APP_IDENTITY        --app-store app signing identity (default: 3rd Party Mac Developer Application).
+  APPSTORE_INSTALLER_IDENTITY  --app-store pkg signing identity (default: 3rd Party Mac Developer Installer).
 EOF
 }
 
@@ -72,6 +89,7 @@ while [[ $# -gt 0 ]]; do
       exit 2
       ;;
     --developer-id) DEVELOPER_ID=1 ;;
+    --app-store) APP_STORE=1 ;;
     --target)
       if [[ $# -lt 2 ]]; then
         echo "--target needs a rustc triple (e.g. aarch64-apple-darwin)" >&2
@@ -88,12 +106,63 @@ done
 
 reject_intel_mac_target "$CARGO_TARGET"
 
+if [[ "$DEVELOPER_ID" -eq 1 && "$APP_STORE" -eq 1 ]]; then
+  echo "--developer-id and --app-store are different products; pick one." >&2
+  exit 2
+fi
+if [[ -z "$FEATURES" ]]; then
+  if [[ "$APP_STORE" -eq 1 ]]; then
+    FEATURES="mic,whisper,appstore"
+  else
+    FEATURES="mic,whisper"
+  fi
+fi
+
 DIST="$ROOT/dist"
 APP="$DIST/lailaisay.app"
 MACOS="$APP/Contents/MacOS"
 RES="$APP/Contents/Resources"
 PLIST_SRC="$ROOT/macos/Info.plist"
 ENTITLEMENTS="$ROOT/macos/lailaisay.entitlements"
+APPSTORE_ENTITLEMENTS="$ROOT/macos/lailaisay-appstore.entitlements"
+APPSTORE_PROFILE="$ROOT/macos/lailaisay-appstore.provisionprofile"
+PKG="$DIST/lailaisay.pkg"
+
+if [[ "$APP_STORE" -eq 1 ]]; then
+  if [[ ! -f "$APPSTORE_ENTITLEMENTS" ]]; then
+    echo "missing $APPSTORE_ENTITLEMENTS" >&2
+    exit 1
+  fi
+  if ! grep -A1 '<key>com.apple.security.app-sandbox</key>' "$APPSTORE_ENTITLEMENTS" | grep -q '<true/>'; then
+    echo "App Store entitlements must enable com.apple.security.app-sandbox." >&2
+    exit 1
+  fi
+  if grep -q 'com.apple.security.automation.apple-events' "$APPSTORE_ENTITLEMENTS"; then
+    echo "App Store entitlements must not request Apple Events automation (sandbox build is clipboard-only)." >&2
+    exit 1
+  fi
+  if [[ "$LAYOUT_ONLY" -eq 0 ]]; then
+    if [[ "$(uname -s)" != "Darwin" ]]; then
+      echo "--app-store requires macOS (codesign + productbuild)." >&2
+      exit 1
+    fi
+    if [[ ! -f "$APPSTORE_PROFILE" ]]; then
+      echo "missing $APPSTORE_PROFILE (Mac App Store provisioning profile for $BUNDLE_ID; see APP_STORE.md)" >&2
+      exit 1
+    fi
+    for identity in "$APPSTORE_APP_IDENTITY" "$APPSTORE_INSTALLER_IDENTITY"; do
+      if ! security find-identity -v 2>/dev/null | grep -F "$identity" | grep -q .; then
+        echo "signing identity not found in the keychain: $identity" >&2
+        echo "Install the certificate (APP_STORE.md §1) or override APPSTORE_APP_IDENTITY / APPSTORE_INSTALLER_IDENTITY." >&2
+        exit 1
+      fi
+    done
+    if ! command -v productbuild >/dev/null 2>&1; then
+      echo "productbuild not found (install Xcode)" >&2
+      exit 1
+    fi
+  fi
+fi
 
 if [[ "$DEVELOPER_ID" -eq 1 ]]; then
   if [[ "$(uname -s)" != "Darwin" ]]; then
@@ -226,7 +295,31 @@ else
   fi
 fi
 
-if [[ "$DEVELOPER_ID" -eq 1 ]]; then
+if [[ "$APP_STORE" -eq 1 ]]; then
+  if [[ -f "$APPSTORE_PROFILE" ]]; then
+    cp "$APPSTORE_PROFILE" "$APP/Contents/embedded.provisionprofile"
+    echo "Embedded provisioning profile → Contents/embedded.provisionprofile"
+  fi
+  if [[ "$LAYOUT_ONLY" -eq 1 ]]; then
+    echo "App Store layout OK (stub executable; not signed, no pkg)."
+  else
+    codesign --force --deep --timestamp \
+      --entitlements "$APPSTORE_ENTITLEMENTS" \
+      --sign "$APPSTORE_APP_IDENTITY" \
+      "$APP"
+    codesign --verify --deep --strict --verbose=2 "$APP"
+    if ! codesign -d --entitlements :- "$APP" 2>/dev/null | grep -q 'com.apple.security.app-sandbox'; then
+      echo "signed app is missing the App Sandbox entitlement" >&2
+      exit 1
+    fi
+    echo "App Store codesign OK ($APPSTORE_APP_IDENTITY)."
+    rm -f "$PKG"
+    productbuild --component "$APP" /Applications \
+      --sign "$APPSTORE_INSTALLER_IDENTITY" \
+      "$PKG"
+    echo "Wrote $PKG (upload with: fastlane mac beta | fastlane mac release)"
+  fi
+elif [[ "$DEVELOPER_ID" -eq 1 ]]; then
   # Preflight already checked Darwin, CODESIGN_IDENTITY, entitlements, and the
   # keychain. No --timestamp / notarytool here so packaging stays offline.
   codesign --force --deep --options runtime \

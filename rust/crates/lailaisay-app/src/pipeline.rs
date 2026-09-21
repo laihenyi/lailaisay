@@ -107,15 +107,19 @@ pub fn open_backend_kind(
     Ok(open_backend(kind, model, sidecar)?)
 }
 
+/// Default dictionaries compiled into the binary. The packaged app has no
+/// repository checkout next to it, and the App Store sandbox returns EPERM
+/// (not NotFound) for a repo path that happens to exist on the build machine.
+const DEFAULT_CUSTOM_WORDS_JSON: &[u8] = include_bytes!("../../../data/DefaultCustomWords.json");
+const DEFAULT_PHONETIC_GLOSSARY_JSON: &[u8] =
+    include_bytes!("../../../data/DefaultPhoneticGlossary.json");
+
 fn load_dictionary() -> Result<CustomWordDictionary> {
     let path = custom_words_path();
     if path.exists() {
         return Ok(CustomWordDictionary::load_path(&path)?);
     }
-    if let Some(bundled) = bundled_data("DefaultCustomWords.json") {
-        return Ok(CustomWordDictionary::load_path(&bundled)?);
-    }
-    Ok(CustomWordDictionary::default())
+    Ok(CustomWordDictionary::from_json_bytes(DEFAULT_CUSTOM_WORDS_JSON)?)
 }
 
 fn load_glossary() -> Result<PhoneticGlossary> {
@@ -123,29 +127,7 @@ fn load_glossary() -> Result<PhoneticGlossary> {
     if path.exists() {
         return Ok(PhoneticGlossary::load_path(&path)?);
     }
-    if let Some(bundled) = bundled_data("DefaultPhoneticGlossary.json") {
-        return Ok(PhoneticGlossary::load_path(&bundled)?);
-    }
-    Ok(PhoneticGlossary::default())
-}
-
-fn bundled_data(name: &str) -> Option<PathBuf> {
-    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let from_crate = manifest.join("../../data").join(name);
-    if from_crate.exists() {
-        return Some(from_crate);
-    }
-    let mut dir = std::env::current_dir().ok()?;
-    for _ in 0..8 {
-        let p = dir.join("rust/data").join(name);
-        if p.exists() {
-            return Some(p);
-        }
-        if !dir.pop() {
-            break;
-        }
-    }
-    None
+    Ok(PhoneticGlossary::from_json_bytes(DEFAULT_PHONETIC_GLOSSARY_JSON)?)
 }
 
 pub fn whisper_prompt(ctx: &AppContext) -> Option<String> {
@@ -236,6 +218,15 @@ pub async fn run_text_pipeline(
                 );
                 if note.is_none() {
                     note = Some("pasted".into());
+                }
+            }
+            Err(lailaisay_paste::PasteError::CopyOnlyFallback(host))
+                if lailaisay_paste::is_app_store_build() =>
+            {
+                tracing::info!(host, "copied to clipboard (sandbox build)");
+                eprintln!("[lailaisay-app] copied to clipboard — press Cmd+V in the target app.");
+                if note.is_none() {
+                    note = Some("copied".into());
                 }
             }
             Err(e) => {
@@ -524,6 +515,14 @@ mod tests {
             out == "去台南。" || out == "去臺南。",
             "dummy sidecar + single segment must match --once: {out:?}"
         );
+    }
+
+    #[test]
+    fn embedded_default_dictionaries_parse() {
+        let dict = CustomWordDictionary::from_json_bytes(DEFAULT_CUSTOM_WORDS_JSON).unwrap();
+        assert!(!dict.entries.is_empty());
+        let glossary = PhoneticGlossary::from_json_bytes(DEFAULT_PHONETIC_GLOSSARY_JSON).unwrap();
+        assert!(!glossary.is_empty());
     }
 
     #[tokio::test]

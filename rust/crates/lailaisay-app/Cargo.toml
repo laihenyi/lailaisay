@@ -19,6 +19,9 @@ default = []
 whisper = ["lailaisay-stt/whisper", "lailaisay-stt/process-whisper"]
 metal = ["lailaisay-stt/metal"]
 mic = ["lailaisay-stt/mic"]
+# Mac App Store build: App Sandbox. Carbon RegisterEventHotKey instead of the
+# CGEvent tap, clipboard-only output, no Accessibility / Automation prompts.
+appstore = ["lailaisay-paste/appstore"]
 
 [dependencies]
 lailaisay-core.workspace = true

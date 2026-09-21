@@ -46,6 +46,8 @@ jobs:
             libxkbcommon-dev libgl1-mesa-dev libegl1-mesa-dev
       - name: Test workspace
         run: cargo test --workspace --features lailaisay-stt/process-whisper
+      - name: Test App Store (sandbox) paste variant
+        run: cargo test -p lailaisay-paste --lib --features appstore
       - name: CLI fixture proof
         run: cargo run -p lailaisay-cli -- transcribe --backend dummy --file fixtures/sample.wav
       - name: lailaisay-app once (dummy, no TCC)
@@ -83,6 +85,16 @@ jobs:
             exit 1
           fi
           ./scripts/notarize-macos.sh --help | grep -q -- 'notarytool'
+          ./scripts/package-macos-app.sh --help | grep -q -- '--app-store'
+          python3 -c "import xml.etree.ElementTree as ET; ET.parse('macos/lailaisay-appstore.entitlements')"
+          grep -q 'com.apple.security.app-sandbox' macos/lailaisay-appstore.entitlements
+          ! grep -q 'com.apple.security.automation.apple-events' macos/lailaisay-appstore.entitlements
+          grep -q 'ITSAppUsesNonExemptEncryption' macos/Info.plist
+          if ./scripts/package-macos-app.sh --layout-only --developer-id --app-store; then
+            echo "--developer-id with --app-store must be rejected" >&2
+            exit 1
+          fi
+          ./scripts/package-macos-app.sh --layout-only --app-store
           ./scripts/package-macos-app.sh --layout-only
           test -f dist/lailaisay.app/Contents/Info.plist
           grep -q 'com.yikai.lailaisay' dist/lailaisay.app/Contents/Info.plist
@@ -116,6 +128,10 @@ jobs:
           xcrun --find clang
       - name: Test macOS application, input and paste
         run: cargo test --locked -p lailaisay-app -p lailaisay-input -p lailaisay-paste --features lailaisay-app/mic,lailaisay-app/whisper --lib
+      - name: Test and check the Mac App Store (sandbox) variant
+        run: |
+          cargo test --locked -p lailaisay-app -p lailaisay-input -p lailaisay-paste --features lailaisay-app/appstore --lib
+          cargo check --locked -p lailaisay-app --features mic,whisper,appstore
       - name: Build release app with microphone and Whisper
         run: cargo build --locked --release -p lailaisay-app --features mic,whisper
       - name: Package and verify real macOS app
