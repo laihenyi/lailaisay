@@ -68,12 +68,12 @@ Mac App Store 審核強制要求 App Sandbox。Developer ID 版（`macos/lailais
 | 支援網址 | 必填 | ✅ https://github.com/laihenyi/lailaisay（2026-09-21 已開啟 Issues 作為聯絡管道） |
 | 行銷網址 | 選填 | ✅ 同上 |
 | 隱私權政策網址 | **必填**；須說明麥克風錄音只在本機處理，選用的 Groq/Gemini 會把文字送到第三方 | ✅ `PRIVACY.md`（中英對照），`fastlane/metadata/*/privacy_url.txt` 指向 https://github.com/laihenyi/lailaisay/blob/main/PRIVACY.md；已 push，公開可存取 |
-| App 隱私（Nutrition Label） | 麥克風音訊不收集、不離開裝置；啟用 Groq/Gemini 時使用者內容會傳給第三方 | 待填 |
-| 年齡分級 | 問卷，預期 4+ | 待填 |
-| 版權 | `© 2026 Henyi Lai` | 待填 |
-| 類別 | 主要：生產力工具；次要：工具程式 | 待填 |
-| 價格與供應範圍 | 免費或定價；地區 | 待決定 |
-| 審核備註 | 操作步驟（按住 ⌘⇧Space → 說話 → 放開 → ⌘V）；首次啟動需下載 Whisper 模型（約 75MB 起）；不需登入 | 待撰寫 |
+| App 隱私（Nutrition Label） | 2026-09-21 已填「不收集資料」並發佈；依據：開發者不接收任何資料，Groq/Gemini 為使用者自備金鑰、預設關閉的選用功能 | ✅ |
+| 年齡分級 | 問卷全部「無／否」，結果 4+（無適用類別） | ✅ 2026-09-21 |
+| 版權 | `© 2026 Henyi Lai`（`metadata/copyright.txt`，隨 `fastlane mac release` 上傳） | ✅ |
+| 類別 | 主要：生產力工具；次要：工具程式；副標題「按住說話，語音變文字」；內容版權：不含第三方內容 | ✅ 2026-09-21 App 資訊已儲存 |
+| 價格與供應範圍 | 免費（USD 0.00，175 個國家或地區，App 發佈時供應） | ✅ 2026-09-21 |
+| 審核備註 | `metadata/review_information/notes.txt`（操作步驟、模型下載、沙盒授權說明、不需登入）；聯絡人 Henyi Lai / james@pilot.game.tw | ⚠️ 已填入版本 1.0 頁面但**聯絡電話為必填**，需在 App Store Connect 補上後按「儲存」；也請補 `review_information/phone_number.txt` |
 | 第三方授權 | whisper.cpp（MIT）、Hex（MIT）、內嵌字型（OFL）已在 `LICENSE`/`NOTICE`/`FONT-LICENSE.txt` | ✅ |
 
 fastlane metadata 目錄結構（`fastlane mac release` 讀取）。截圖重製：開啟設定視窗後用 `screencapture -l <windowID>` 擷取各分頁，再用 PIL 合成 1440×900 背景與標題。

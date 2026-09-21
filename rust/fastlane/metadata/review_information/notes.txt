@@ -1,0 +1,19 @@
+lailaisay is a press-and-hold voice dictation utility for macOS. No account or sign-in is required. It is a menu bar app (LSUIElement) with a Dock icon; the settings window opens from the menu bar icon → 設定 (Settings), or automatically on first launch.
+
+HOW TO TEST
+1. Launch the app and allow Microphone access when prompted.
+2. In Settings → 語音模型 (Speech Model), pick a Whisper model (we recommend "tiny" or "base", about 75–150 MB). The model is downloaded once from huggingface.co and stored inside the app's sandbox container.
+3. Open any app with a text field (e.g. TextEdit or Notes).
+4. Press and HOLD ⌘⇧Space, speak (Traditional Chinese or English), then release.
+5. The status changes to 已複製 (Copied). Press ⌘V to paste the recognized text.
+
+Speech recognition runs entirely on-device with whisper.cpp (Metal). The optional "AI 潤稿" (AI polish) feature is OFF by default and only works if the user enters their own Groq/Gemini API key or points to a local Ollama server.
+
+SANDBOX ENTITLEMENTS
+- com.apple.security.device.audio-input: microphone recording while the hotkey is held.
+- com.apple.security.network.client: one-time Whisper model download from huggingface.co; optional user-configured Groq/Gemini/Ollama text polish.
+- com.apple.security.files.user-selected.read-only: importing a custom-dictionary JSON file chosen by the user in an Open panel.
+
+Global hotkey uses Carbon RegisterEventHotKey (no Accessibility / Input Monitoring permission). Output is clipboard-only in the App Store build; the app never injects keystrokes into other apps.
+
+Privacy policy: https://github.com/laihenyi/lailaisay/blob/main/PRIVACY.md
