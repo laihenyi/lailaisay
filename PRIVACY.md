@@ -57,5 +57,5 @@ Updates will be posted on this page with a new effective date above.
 
 ## 8. 聯絡方式 / Contact
 
-如有任何疑問，請透過 GitHub 專案頁面聯絡我們：https://github.com/laihenyi/lailaisay
-For questions, contact us via the GitHub project page: https://github.com/laihenyi/lailaisay
+如有任何疑問，請在 GitHub 專案開啟 Issue：https://github.com/laihenyi/lailaisay/issues
+For questions, open an issue on the GitHub project: https://github.com/laihenyi/lailaisay/issues
