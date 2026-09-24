@@ -1,6 +1,10 @@
-//! Non-prompting macOS permission probes for the Settings 權限 pane.
+//! macOS permission probes for the Settings 權限 pane.
 //!
-//! Compiled only on `target_os = "macos"`. Never call request/prompt APIs here.
+//! Compiled only on `target_os = "macos"`. Every probe here is non-prompting;
+//! the single exception is [`request_microphone_access`], which deliberately
+//! shows the system microphone consent dialog (App Review requires the app to
+//! be listed under Privacy & Security → Microphone, which only happens after
+//! the app has asked at least once).
 
 use std::ffi::c_void;
 use std::sync::Mutex;
@@ -107,6 +111,33 @@ fn avcapture_audio_status() -> GrantStatus {
         };
         let status: i64 = msg_send![cls, authorizationStatusForMediaType: media];
         map_av_authorization_status(status)
+    }
+}
+
+/// Ask macOS for microphone consent via
+/// `AVCaptureDevice requestAccessForMediaType:completionHandler:`.
+///
+/// Shows the TCC dialog only while the decision is `NotDetermined`; otherwise
+/// the completion handler fires immediately with the stored decision. Either
+/// way the app is registered under Privacy & Security → Microphone.
+pub fn request_microphone_access() {
+    unsafe {
+        let Some(ns) = Class::get("NSString") else {
+            return;
+        };
+        let media: *mut Object = msg_send![ns, stringWithUTF8String: AV_MEDIA_TYPE_AUDIO.as_ptr()];
+        if media.is_null() {
+            return;
+        }
+        let Some(cls) = Class::get("AVCaptureDevice") else {
+            return;
+        };
+        let handler = block::ConcreteBlock::new(|granted: objc::runtime::BOOL| {
+            let granted = granted != objc::runtime::NO;
+            eprintln!("[lailaisay-input] microphone access request completed: granted={granted}");
+        });
+        let handler = handler.copy();
+        let _: () = msg_send![cls, requestAccessForMediaType: media completionHandler: &*handler];
     }
 }
 

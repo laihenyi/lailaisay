@@ -790,6 +790,12 @@ impl LailaisayHost {
         if self.settings_visible {
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
         }
+        // Ask for microphone consent up front so the app is listed under
+        // Privacy & Security → Microphone before the first recording. macOS
+        // only shows the dialog while the decision is NotDetermined.
+        if lailaisay_input::should_request_microphone(lailaisay_input::microphone_grant()) {
+            lailaisay_input::request_microphone_access();
+        }
 
         if self.opts.enable_tap {
             let (hotkey, edit_hotkey, double_tap) = {

@@ -18,7 +18,7 @@ Mac App Store 審核強制要求 App Sandbox。Developer ID 版（`macos/lailais
 
 已驗證（2026-09-21，本機 Apple Silicon）：`--app-store` 打包成功、`codesign` 含 sandbox entitlement、`pkgutil --check-signature` 通過；以 `open dist/lailaisay.app` 啟動後程序存活、`hex_settings.json` 寫入容器 `Data/Documents`、stderr 出現「Carbon hotkey registered (⌘⇧SPACE)」。預設字典改為編譯進二進位（原本從 repo 路徑讀取，沙盒下會 EPERM）。
 
-已實機驗證（2026-09-21）：Carbon 熱鍵 ⌘⇧Space 按住說話可用。尚待驗證：模型下載是否落在容器內、`rfd` 開檔面板匯入字典。注意：從終端機直接執行沙盒版二進位不會重設 `HOME`，會因存取 `~/Documents` 失敗而退出；請用 `open dist/lailaisay.app` 測試。`--once` 需讀 repo 內的 fixture，沙盒版不適用。
+已實機驗證（2026-09-21）：Carbon 熱鍵 ⌘⇧Space 按住說話可用。（2026-09-24）啟動時出現麥克風授權詢問。尚待驗證：模型下載是否落在容器內、`rfd` 開檔面板匯入字典。注意：從終端機直接執行沙盒版二進位不會重設 `HOME`，會因存取 `~/Documents` 失敗而退出；請用 `open dist/lailaisay.app` 測試。`--once` 需讀 repo 內的 fixture，沙盒版不適用。
 
 ## 1. 憑證與 Developer Portal 狀態（2026-09-21）
 
@@ -95,7 +95,9 @@ rust/fastlane/screenshots/zh-Hant/*.png
 | --- | --- | --- |
 | 2026-09-21 | 1.0 (1) | `fastlane mac release` 上傳 pkg + metadata + 截圖，`fastlane mac submit_review` 送審 |
 | 2026-09-22 | 1.0 (1) | **被拒**：二進位引用私有 API `_CGSSetWindowBackgroundBlurRadius`（來自 winit 0.30.13 `set_blur`）。修法：`vendor/winit` 移除該 FFI 與呼叫，`Cargo.toml` `[patch.crates-io]` 覆蓋 |
-| 2026-09-22 | 1.0 (2) | 以修正後的 winit 重新打包、`fastlane mac beta` 上傳 build 2，App Store Connect 網頁「更新審查內容 → 重新提交至 App 審查」重送；狀態 WAITING_FOR_REVIEW |
+| 2026-09-22 | 1.0 (2) | 以修正後的 winit 重新打包、`fastlane mac beta` 上傳 build 2，App Store Connect 網頁「更新審查內容 → 重新提交至 App 審查」重送 |
+| 2026-09-23 | 1.0 (2) | **被拒** 2.1(a)：審核者在權限頁按「開啟」後，系統麥克風清單裡沒有 lailaisay（App 從未發出 TCC 請求，只有第一次錄音時 cpal 才觸發） |
+| 2026-09-24 | 1.0 (3) | 修法：啟動時與權限頁「開啟」主動呼叫 `AVCaptureDevice requestAccessForMediaType:`（`lailaisay-input::request_microphone_access`），本機 `tccutil reset Microphone com.yikai.lailaisay` 後啟動即出現授權詢問；上傳 build 3 重送 |
 
 ### 5.4 之後每次更新的標準流程
 

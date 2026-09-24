@@ -11,6 +11,7 @@ thiserror.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
+block = "0.1"
 
 # objc 0.2 macros emit this legacy conditional in the consuming crate.
 # Register only that known value; other unexpected cfg values remain warnings.

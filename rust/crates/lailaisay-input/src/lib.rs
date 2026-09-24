@@ -44,8 +44,9 @@ pub use mapping::{flags_to_modifiers, key_event_from_cg, keycode_to_key, CgEvent
 pub use permissions::{
     accessibility_grant, accessibility_trusted, automation_grant, input_monitoring_grant,
     map_automation_status, map_av_authorization_status, map_avaudio_record_permission,
-    microphone_grant, note_microphone_opened, resolve_accessibility_grant,
-    resolve_input_monitoring_grant, resolve_microphone_grant, GrantStatus, ACCESSIBILITY_HELP,
+    microphone_grant, note_microphone_opened, request_microphone_access,
+    resolve_accessibility_grant, resolve_input_monitoring_grant, resolve_microphone_grant,
+    should_request_microphone, GrantStatus, ACCESSIBILITY_HELP,
     MICROPHONE_HELP, WINDOWS_HOTKEY_HELP, WINDOWS_MICROPHONE_HELP,
 };
 pub use swallow::should_swallow;

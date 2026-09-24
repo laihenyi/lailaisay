@@ -1934,7 +1934,7 @@ fn perm_lamp_color(status: GrantStatus, on_macos: bool) -> Color32 {
 fn permission_hint(pane: PrivacyPane, status: GrantStatus) -> Option<&'static str> {
     match (pane, status) {
         (PrivacyPane::Microphone, GrantStatus::NotDetermined) => {
-            Some("macOS 尚未取得錄音授權決定；首次按住說話時會詢問。")
+            Some("macOS 尚未取得錄音授權決定；按「開啟」或首次按住說話時會詢問。")
         }
         (PrivacyPane::Automation, GrantStatus::NotDetermined) => {
             Some("macOS 尚未允許控制 System Events；首次需要自動貼上時會詢問。")
@@ -2007,6 +2007,12 @@ fn perm_row(ui: &mut Ui, title: &str, detail: &str, pane: PrivacyPane) -> Option
     if can_open {
         let resp = resp.on_hover_cursor(CursorIcon::PointingHand);
         if resp.clicked() || open_clicked {
+            if microphone_click_should_prompt(pane, grant) {
+                // The app only appears in System Settings → Microphone after it
+                // has asked once, so ask first instead of opening an empty list.
+                lailaisay_input::request_microphone_access();
+                return Some(String::new());
+            }
             return match open_macos_privacy_settings(pane) {
                 Ok(()) => Some(String::new()),
                 Err(e) => Some(e),
@@ -2014,6 +2020,12 @@ fn perm_row(ui: &mut Ui, title: &str, detail: &str, pane: PrivacyPane) -> Option
         }
     }
     None
+}
+
+/// Clicking the 麥克風 row while macOS has no decision yet should show the
+/// system consent dialog rather than open a Privacy list the app is not in.
+fn microphone_click_should_prompt(pane: PrivacyPane, status: GrantStatus) -> bool {
+    pane == PrivacyPane::Microphone && status == GrantStatus::NotDetermined
 }
 
 pub fn paint_status_strip(ui: &mut Ui, status: &str, detail: &str) {
@@ -3176,8 +3188,20 @@ mod tests {
         assert!(
             permission_hint(PrivacyPane::Microphone, GrantStatus::NotDetermined)
                 .unwrap()
-                .contains("首次按住說話")
+                .contains("按「開啟」")
         );
+        assert!(microphone_click_should_prompt(
+            PrivacyPane::Microphone,
+            GrantStatus::NotDetermined
+        ));
+        assert!(!microphone_click_should_prompt(
+            PrivacyPane::Microphone,
+            GrantStatus::Denied
+        ));
+        assert!(!microphone_click_should_prompt(
+            PrivacyPane::Accessibility,
+            GrantStatus::NotDetermined
+        ));
         assert!(
             permission_hint(PrivacyPane::Automation, GrantStatus::TargetNotRunning)
                 .unwrap()

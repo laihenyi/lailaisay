@@ -202,6 +202,22 @@ pub fn microphone_grant() -> GrantStatus {
     }
 }
 
+/// True when asking macOS for microphone consent is worthwhile: the decision
+/// has not been made yet, or the probe could not read it. Granted / Denied
+/// never re-prompt, so asking again would only waste a call.
+pub fn should_request_microphone(status: GrantStatus) -> bool {
+    matches!(status, GrantStatus::NotDetermined | GrantStatus::Unknown)
+}
+
+/// Show the macOS microphone consent dialog (no-op elsewhere). Registers the
+/// app under Privacy & Security → Microphone even before the first recording.
+pub fn request_microphone_access() {
+    #[cfg(target_os = "macos")]
+    {
+        crate::macos_tcc::request_microphone_access();
+    }
+}
+
 pub fn input_monitoring_grant() -> GrantStatus {
     #[cfg(target_os = "macos")]
     {
