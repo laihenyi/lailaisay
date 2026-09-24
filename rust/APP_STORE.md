@@ -97,6 +97,7 @@ rust/fastlane/screenshots/zh-Hant/*.png
 | 2026-09-22 | 1.0 (1) | **被拒**：二進位引用私有 API `_CGSSetWindowBackgroundBlurRadius`（來自 winit 0.30.13 `set_blur`）。修法：`vendor/winit` 移除該 FFI 與呼叫，`Cargo.toml` `[patch.crates-io]` 覆蓋 |
 | 2026-09-22 | 1.0 (2) | 以修正後的 winit 重新打包、`fastlane mac beta` 上傳 build 2，App Store Connect 網頁「更新審查內容 → 重新提交至 App 審查」重送 |
 | 2026-09-23 | 1.0 (2) | **被拒** 2.1(a)：審核者在權限頁按「開啟」後，系統麥克風清單裡沒有 lailaisay（App 從未發出 TCC 請求，只有第一次錄音時 cpal 才觸發） |
+| 2026-09-24 | 1.0 (3) | Apple 通知 ITMS-90886（build 3 簽章缺 `com.apple.application-identifier`，只影響 TestFlight，不影響審核）。已在 `lailaisay-appstore.entitlements` 加入 application-identifier 與 team-identifier，下次上傳生效 |
 | 2026-09-24 | 1.0 (3) | 修法：啟動時與權限頁「開啟」主動呼叫 `AVCaptureDevice requestAccessForMediaType:`（`lailaisay-input::request_microphone_access`），本機 `tccutil reset Microphone com.yikai.lailaisay` 後啟動即出現授權詢問；上傳 build 3，API `PATCH /appStoreVersions/{id}/relationships/build` 綁定 build，網頁「更新審查內容 → 重新提交至 App 審查」重送；狀態 WAITING_FOR_REVIEW |
 
 ### 5.4 之後每次更新的標準流程

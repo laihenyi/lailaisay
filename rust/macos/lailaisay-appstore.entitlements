@@ -10,6 +10,12 @@
 -->
 <plist version="1.0">
 <dict>
+	<!-- Required for TestFlight (ITMS-90886): must match the provisioning
+	     profile's application identifier and team. -->
+	<key>com.apple.application-identifier</key>
+	<string>S6EDV86VSB.com.yikai.lailaisay</string>
+	<key>com.apple.developer.team-identifier</key>
+	<string>S6EDV86VSB</string>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
 	<!-- Microphone capture. -->
