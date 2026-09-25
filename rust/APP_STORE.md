@@ -100,7 +100,7 @@ rust/fastlane/screenshots/zh-Hant/*.png
 | 2026-09-24 | 1.0 (3) | Apple 通知 ITMS-90886（build 3 簽章缺 `com.apple.application-identifier`，只影響 TestFlight，不影響審核）。已在 `lailaisay-appstore.entitlements` 加入 application-identifier 與 team-identifier，下次上傳生效 |
 | 2026-09-24 | 1.0 (3) | 修法：啟動時與權限頁「開啟」主動呼叫 `AVCaptureDevice requestAccessForMediaType:`（`lailaisay-input::request_microphone_access`），本機 `tccutil reset Microphone com.yikai.lailaisay` 後啟動即出現授權詢問；上傳 build 3，API `PATCH /appStoreVersions/{id}/relationships/build` 綁定 build，網頁「更新審查內容 → 重新提交至 App 審查」重送；狀態 WAITING_FOR_REVIEW |
 | 2026-09-25 | 1.0 (3) | **被拒** 2.1(a)：「嘗試聽寫時出現錯誤訊息」（MacBook Air M3、macOS 27.0）。本機全新沙盒重現：預設 AI 潤稿 Smart + Ollama，審核機沒有 Ollama，文字其實已複製，但狀態列被「Ollama unavailable — local filters only」蓋掉並顯示紅色「錯誤」 |
-| 2026-09-26 | 1.0 (4) | 修法：成功貼上／複製的狀態優先（`copied; <附註>` 顯示綠色已複製）；App Store 版首次安裝預設關閉 AI 潤稿；無模型時顯示「需要語音模型」與指引；無模型時下載完成自動啟用。build 4 送審，審查備註同步更新 |
+| 2026-09-26 | 1.0 (4) | 修法：成功貼上／複製的狀態優先（`copied; <附註>` 顯示綠色已複製）；App Store 版首次安裝預設關閉 AI 潤稿；無模型時顯示「需要語音模型」與指引；無模型時下載完成自動啟用；沙盒讀不到選取文字，App Store 版隱藏「選取改寫」並不註冊 ⌥⇧Space。build 4 送審，審查備註同步更新 |
 
 ### 5.4 之後每次更新的標準流程
 

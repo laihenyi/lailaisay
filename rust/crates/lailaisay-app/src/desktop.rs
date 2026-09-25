@@ -196,7 +196,9 @@ mod native {
         menu.append(&status_item)?;
         menu.append(&PredefinedMenuItem::separator())?;
         menu.append(&settings_item)?;
-        menu.append(&edit_item)?;
+        if crate::settings_ui::speak_to_edit_supported() {
+            menu.append(&edit_item)?;
+        }
         menu.append(&quit_item)?;
         let tray = TrayIconBuilder::new()
             .with_menu(Box::new(menu))

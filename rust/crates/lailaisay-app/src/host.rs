@@ -505,7 +505,9 @@ impl LailaisayHost {
                 {
                     if let Some(tap) = self.tap.as_mut() {
                         tap.set_hotkey(settings.hotkey.clone(), settings.use_double_tap_only);
-                        tap.set_edit_hotkey(settings.edit_hotkey.clone());
+                        if crate::settings_ui::speak_to_edit_supported() {
+                            tap.set_edit_hotkey(settings.edit_hotkey.clone());
+                        }
                     }
                 }
                 #[cfg(all(target_os = "macos", feature = "appstore"))]
@@ -849,7 +851,8 @@ impl LailaisayHost {
             )) {
                 Ok(mut t) => {
                     t.set_hotkey(hotkey.clone(), double_tap);
-                    t.set_edit_hotkey(edit_hotkey);
+                    // Speak-to-Edit needs Accessibility; not in the sandbox.
+                    let _ = edit_hotkey;
                     match t.last_error() {
                         None => {
                             set_shared_status(&self.shared, "idle");

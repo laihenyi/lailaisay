@@ -583,9 +583,11 @@ impl SettingsForm {
         hotkey_editor(ui, "dictation_hotkey", &mut self.hotkey);
         ui.add_space(6.0);
 
-        ui.label(egui::RichText::new("選取改寫").size(14.0).color(FG));
-        note(ui, "先選文字，再說「精簡一點」。");
-        hotkey_editor(ui, "edit_hotkey", &mut self.edit_hotkey);
+        if speak_to_edit_supported() {
+            ui.label(egui::RichText::new("選取改寫").size(14.0).color(FG));
+            note(ui, "先選文字，再說「精簡一點」。");
+            hotkey_editor(ui, "edit_hotkey", &mut self.edit_hotkey);
+        }
         if let Some(error) = self.validation_error() {
             danger_note(ui, error);
         }
@@ -2073,6 +2075,13 @@ fn needs_permission(status: &str) -> bool {
     s.contains("needs") || s.contains("permission") || s.contains("accessibility")
 }
 
+/// Speak-to-Edit reads the focused field's selection through Accessibility,
+/// which the sandboxed App Store build cannot do, so the feature (and its
+/// hotkey) only exists in the Developer ID / Windows builds.
+pub fn speak_to_edit_supported() -> bool {
+    !lailaisay_paste::is_app_store_build()
+}
+
 pub fn status_appearance(status: &str) -> (String, Color32) {
     let s = status.to_ascii_lowercase();
     if s.contains("record") {
@@ -2814,6 +2823,15 @@ mod tests {
         assert_eq!(
             tray_glyph_from_status("paste failed — clipboard has text (x)"),
             TrayGlyph::Error
+        );
+    }
+
+    #[test]
+    fn speak_to_edit_hidden_only_in_app_store_build() {
+        assert_eq!(
+            speak_to_edit_supported(),
+            !cfg!(feature = "appstore"),
+            "sandbox cannot read the selection"
         );
     }
 
