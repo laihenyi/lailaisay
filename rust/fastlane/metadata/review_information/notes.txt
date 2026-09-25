@@ -1,5 +1,8 @@
 lailaisay is a press-and-hold voice dictation utility for macOS. No account or sign-in is required. It is a menu bar app (LSUIElement) with a Dock icon; the settings window opens from the menu bar icon → 設定 (Settings), or automatically on first launch.
 
+CHANGES IN BUILD 4 (response to the 2.1(a) review of build 3)
+In build 3 the recognized text was already copied to the clipboard, but the optional AI polish tried to reach a local Ollama server, and its "Ollama unavailable" note replaced the status with a red error. Build 4 fixes this: AI polish is off by default, a successful copy always shows a green 已複製 (Copied), and dictating before a model is downloaded shows 需要語音模型 (Speech model needed) instead of an error.
+
 HOW TO TEST
 1. Launch the app and allow Microphone access when prompted.
 2. In Settings → 語音模型 (Speech Model), under 目錄下載 (Catalog download) keep "small" (about 466 MB) selected and click 下載所選 (Download selected). The model is downloaded once from huggingface.co into the app's sandbox container and becomes active automatically when the download finishes (the line 目前載入 shows ggml-small.bin).
