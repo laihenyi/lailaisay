@@ -20,6 +20,16 @@ pub struct AppContext {
     pub paste_target: Option<PasteTarget>,
 }
 
+/// First launch of the Mac App Store build: no LLM polish until the user
+/// configures a provider. The sandboxed build cannot assume a local Ollama,
+/// and a missing provider must not surface as an error on the first dictation.
+/// Developer ID / Windows defaults are unchanged.
+pub fn apply_first_run_distribution_defaults(settings: &mut LailaisaySettings) {
+    if lailaisay_paste::is_app_store_build() {
+        settings.ai_enhancement_mode = lailaisay_core::AiEnhancementMode::Off;
+    }
+}
+
 /// Load settings + bundled dictionaries. A missing file uses defaults.
 /// A corrupt settings file is warned and replaced with defaults so `--once`
 /// still works on a first-time machine.
@@ -44,6 +54,9 @@ pub fn load_app_context() -> Result<AppContext> {
     // Existing file → onboarding complete so minimize-to-tray is honored.
     // Missing / unreadable file stays first-run (Settings opens once).
     let mut settings = LailaisaySettings::for_launch(&path);
+    if !path.exists() {
+        apply_first_run_distribution_defaults(&mut settings);
+    }
     if let Some((old, next)) = settings.apply_whisper_model_remap() {
         let reason = if old.contains(lailaisay_core::LEGACY_MACOS_SUPPORT_NAME) {
             lailaisay_core::LEGACY_MACOS_SUPPORT_NAME
@@ -119,7 +132,9 @@ fn load_dictionary() -> Result<CustomWordDictionary> {
     if path.exists() {
         return Ok(CustomWordDictionary::load_path(&path)?);
     }
-    Ok(CustomWordDictionary::from_json_bytes(DEFAULT_CUSTOM_WORDS_JSON)?)
+    Ok(CustomWordDictionary::from_json_bytes(
+        DEFAULT_CUSTOM_WORDS_JSON,
+    )?)
 }
 
 fn load_glossary() -> Result<PhoneticGlossary> {
@@ -127,7 +142,9 @@ fn load_glossary() -> Result<PhoneticGlossary> {
     if path.exists() {
         return Ok(PhoneticGlossary::load_path(&path)?);
     }
-    Ok(PhoneticGlossary::from_json_bytes(DEFAULT_PHONETIC_GLOSSARY_JSON)?)
+    Ok(PhoneticGlossary::from_json_bytes(
+        DEFAULT_PHONETIC_GLOSSARY_JSON,
+    )?)
 }
 
 pub fn whisper_prompt(ctx: &AppContext) -> Option<String> {
@@ -216,18 +233,14 @@ pub async fn run_text_pipeline(
                         .unwrap_or_else(|| "frontmost".into()),
                     "pasted"
                 );
-                if note.is_none() {
-                    note = Some("pasted".into());
-                }
+                note = Some(success_status("pasted", note));
             }
             Err(lailaisay_paste::PasteError::CopyOnlyFallback(host))
                 if lailaisay_paste::is_app_store_build() =>
             {
                 tracing::info!(host, "copied to clipboard (sandbox build)");
                 eprintln!("[lailaisay-app] copied to clipboard — press Cmd+V in the target app.");
-                if note.is_none() {
-                    note = Some("copied".into());
-                }
+                note = Some(success_status("copied", note));
             }
             Err(e) => {
                 tracing::warn!("paste failed (clipboard still holds text): {e}");
@@ -247,6 +260,17 @@ pub async fn run_text_pipeline(
         polished,
         note,
     })
+}
+
+/// Status after a successful paste / copy. The text reached the user, so the
+/// success word leads and wins in `status_appearance`; an enhancement note
+/// (e.g. "Ollama unavailable — local filters only") is kept as a suffix
+/// instead of turning a working dictation into a red 錯誤.
+fn success_status(success: &str, note: Option<String>) -> String {
+    match note {
+        Some(n) if !n.trim().is_empty() => format!("{success}; {n}"),
+        _ => success.to_string(),
+    }
 }
 
 /// Speak-to-Edit: STT instruction + selected text → LLM rewrite → replace selection.
@@ -632,5 +656,40 @@ mod tests {
             "{}",
             out.local
         );
+    }
+}
+
+#[cfg(test)]
+mod status_tests {
+    use super::*;
+
+    #[test]
+    fn success_status_keeps_note_as_suffix() {
+        assert_eq!(success_status("copied", None), "copied");
+        assert_eq!(success_status("pasted", Some(" ".into())), "pasted");
+        assert_eq!(
+            success_status(
+                "copied",
+                Some("Ollama unavailable — local filters only".into())
+            ),
+            "copied; Ollama unavailable — local filters only"
+        );
+    }
+
+    #[test]
+    fn first_run_defaults_turn_polish_off_only_for_app_store() {
+        let mut s = LailaisaySettings::default();
+        apply_first_run_distribution_defaults(&mut s);
+        if lailaisay_paste::is_app_store_build() {
+            assert_eq!(
+                s.ai_enhancement_mode,
+                lailaisay_core::AiEnhancementMode::Off
+            );
+        } else {
+            assert_eq!(
+                s.ai_enhancement_mode,
+                LailaisaySettings::default().ai_enhancement_mode
+            );
+        }
     }
 }

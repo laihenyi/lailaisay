@@ -2087,6 +2087,8 @@ pub fn status_appearance(status: &str) -> (String, Color32) {
         ("已複製".into(), SUCCESS)
     } else if s.contains("hotkey unavailable") {
         ("熱鍵未生效".into(), DANGER)
+    } else if s.contains("no model") {
+        ("需要語音模型".into(), WARN)
     } else if s.contains("hold longer") {
         ("請按久一點".into(), WARN)
     } else if s.contains("no speech") {
@@ -2115,10 +2117,16 @@ pub fn status_detail(status: &str, hold_label: &str, whisper_name: &str, ai_mode
         format!("whisper.cpp · {whisper_name}")
     } else if s.contains("enhanc") {
         format!("Ollama · {ai_model}")
+    } else if (s.contains("pasted") || s.contains("replaced")) && delivered_without_polish(&s) {
+        "已寫入目前輸入框（AI 潤稿未執行，使用本機辨識結果）".into()
     } else if s.contains("pasted") || s.contains("replaced") {
         "已寫入目前輸入框".into()
+    } else if s.contains("copied") && delivered_without_polish(&s) {
+        "已複製到剪貼簿，請按 ⌘V 貼上（AI 潤稿未執行，使用本機辨識結果）".into()
     } else if s.contains("copied") {
         "已複製到剪貼簿，請在目標 App 按 ⌘V 貼上".into()
+    } else if s.contains("no model") {
+        "尚未載入語音模型：到「語音模型」下載一個模型（例如 small），完成後即可使用".into()
     } else if s.contains("hotkey unavailable") {
         "App Store 版熱鍵需包含修飾鍵與一個按鍵（例如 ⌘⇧Space），且未被其他 App 佔用".into()
     } else if s.contains("hold longer") {
@@ -2143,9 +2151,26 @@ pub fn status_detail(status: &str, hold_label: &str, whisper_name: &str, ai_mode
     }
 }
 
+/// A delivered result ("pasted" / "copied" / "replaced"), possibly with an
+/// enhancement note suffix such as "copied; Ollama unavailable — …".
+fn is_delivered_status(s: &str) -> bool {
+    s.starts_with("pasted") || s.starts_with("copied") || s.starts_with("replaced")
+}
+
+/// The delivered status carries a note that AI polish did not run.
+fn delivered_without_polish(s: &str) -> bool {
+    is_delivered_status(s)
+        && (s.contains("unavailable")
+            || s.contains("fail")
+            || s.contains("error")
+            || s.contains("timeout"))
+}
+
 pub fn tray_glyph_from_status(status: &str) -> TrayGlyph {
     let s = status.to_ascii_lowercase();
-    if s.contains("fail")
+    if is_delivered_status(&s) {
+        TrayGlyph::Idle
+    } else if s.contains("fail")
         || s.contains("error")
         || s.contains("unavailable")
         || s.contains("denied")
@@ -2769,6 +2794,40 @@ mod tests {
             "{label}"
         );
         assert!(label.to_ascii_lowercase().contains("space"), "{label}");
+    }
+
+    #[test]
+    fn delivered_text_with_polish_note_is_success_not_error() {
+        for status in [
+            "copied; Ollama unavailable — local filters only",
+            "pasted; Groq request failed: timeout",
+        ] {
+            let (label, color) = status_appearance(status);
+            assert_eq!(color, SUCCESS, "{status} → {label}");
+            assert!(!label.contains("錯誤"), "{status} → {label}");
+            assert_eq!(tray_glyph_from_status(status), TrayGlyph::Idle, "{status}");
+            let detail = status_detail(status, "⌘⇧Space", "small", "llama");
+            assert!(detail.contains("AI 潤稿未執行"), "{detail}");
+        }
+        assert!(!status_detail("copied", "⌘⇧Space", "small", "").contains("未執行"));
+        // A real paste failure stays an error.
+        assert_eq!(
+            tray_glyph_from_status("paste failed — clipboard has text (x)"),
+            TrayGlyph::Error
+        );
+    }
+
+    #[test]
+    fn no_model_status_points_to_model_pane() {
+        let (label, color) = status_appearance(crate::shared::NO_MODEL_STATUS);
+        assert_eq!(label, "需要語音模型");
+        assert_eq!(color, WARN);
+        let detail = status_detail(crate::shared::NO_MODEL_STATUS, "⌘⇧Space", "", "");
+        assert!(detail.contains("語音模型"), "{detail}");
+        assert_eq!(
+            tray_glyph_from_status(crate::shared::NO_MODEL_STATUS),
+            TrayGlyph::Idle
+        );
     }
 
     #[test]

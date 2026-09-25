@@ -34,10 +34,10 @@ use crate::desktop::{build_tray, status_icon};
 use crate::macos_runtime::{apply_activation_policy, workspace_frontmost};
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use lailaisay_core::HotKeyProcessor;
-#[cfg(all(target_os = "macos", not(feature = "appstore")))]
-use lailaisay_input::{MacOsEventTap, ACCESSIBILITY_HELP, MICROPHONE_HELP};
 #[cfg(all(target_os = "macos", feature = "appstore"))]
 use lailaisay_input::{MacOsCarbonHotkey, MICROPHONE_HELP};
+#[cfg(all(target_os = "macos", not(feature = "appstore")))]
+use lailaisay_input::{MacOsEventTap, ACCESSIBILITY_HELP, MICROPHONE_HELP};
 /// Global hotkey source on macOS: CGEvent tap, or Carbon hot keys in the sandboxed App Store build.
 #[cfg(all(target_os = "macos", not(feature = "appstore")))]
 type MacHotkeySource = MacOsEventTap;
@@ -99,7 +99,9 @@ pub fn run_with(opts: RuntimeOpts) -> Result<()> {
         }
         eprintln!("{MICROPHONE_HELP}");
         #[cfg(feature = "appstore")]
-        eprintln!("[lailaisay-app] App Store build: Carbon hotkey, clipboard output (Cmd+V to paste).");
+        eprintln!(
+            "[lailaisay-app] App Store build: Carbon hotkey, clipboard output (Cmd+V to paste)."
+        );
     }
     #[cfg(target_os = "windows")]
     {
@@ -548,10 +550,25 @@ impl LailaisayHost {
             self.form.downloading = false;
             match result {
                 Ok(path) => {
+                    // With no usable model loaded, activate the download right
+                    // away so the next hold-to-talk works without a separate
+                    // 儲存設定 step. Never auto-save other pending edits.
+                    let activate = !self.form.is_dirty() && {
+                        let g = self.shared.lock().unwrap_or_else(|e| e.into_inner());
+                        g.stt_is_placeholder()
+                    };
                     self.form.selected_model = path.to_string_lossy().into_owned();
                     self.form.refresh_models();
-                    self.form.download_message =
-                        format!("Downloaded {}. Save to make it active.", path.display());
+                    if activate {
+                        self.save_settings();
+                        self.form.download_message = format!(
+                            "已下載並啟用 {}，背景載入完成後即可按住說話。",
+                            path.display()
+                        );
+                    } else {
+                        self.form.download_message =
+                            format!("Downloaded {}. Save to make it active.", path.display());
+                    }
                 }
                 Err(e) => {
                     self.form.download_message = format!("Download failed: {e}");

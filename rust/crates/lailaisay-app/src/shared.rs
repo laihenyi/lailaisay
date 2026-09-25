@@ -57,6 +57,20 @@ impl SharedState {
         }
     }
 
+    /// True while the resident STT is the dummy placeholder (no model file,
+    /// or the selected model failed to load), so an empty result means
+    /// "download a model" rather than "no speech".
+    pub fn stt_is_placeholder(&self) -> bool {
+        self.stt_note.starts_with("dummy")
+    }
+
+    /// Drop a stale "no model" status once a real model is resident.
+    pub fn clear_no_model_status(&mut self) {
+        if self.status == NO_MODEL_STATUS && !self.stt_is_placeholder() {
+            self.set_status("idle");
+        }
+    }
+
     pub fn current_stt_note(&self) -> String {
         self.stt
             .as_ref()
@@ -148,6 +162,9 @@ impl SharedState {
     }
 }
 
+/// Status shown when dictation ran without a usable speech model.
+pub const NO_MODEL_STATUS: &str = "no model";
+
 fn dummy_backend() -> Arc<dyn Transcriber> {
     Arc::from(
         open_backend(BackendKind::Dummy, None, None)
@@ -180,6 +197,7 @@ pub fn spawn_worker(shared: Arc<Mutex<SharedState>>, rx: mpsc::Receiver<Work>) {
                     Work::ReloadModel => {
                         if let Ok(mut g) = shared.lock() {
                             g.force_reload_stt();
+                            g.clear_no_model_status();
                         }
                     }
                     Work::SpeakToEdit { pcm, selected } => {
@@ -226,10 +244,10 @@ pub fn spawn_worker(shared: Arc<Mutex<SharedState>>, rx: mpsc::Receiver<Work>) {
                         }
                     }
                     Work::Transcribe(pcm) => {
-                        let (stt, ctx) = {
+                        let (stt, ctx, no_model) = {
                             let mut g = shared.lock().unwrap_or_else(|e| e.into_inner());
                             g.ensure_stt();
-                            (g.stt.clone(), g.app_context())
+                            (g.stt.clone(), g.app_context(), g.stt_is_placeholder())
                         };
                         let prompt = whisper_prompt(&ctx);
                         let lang = whisper_decode_language(&ctx.settings);
@@ -297,7 +315,9 @@ pub fn spawn_worker(shared: Arc<Mutex<SharedState>>, rx: mpsc::Receiver<Work>) {
                                     }
                                 }
                                 tracing::info!("result: {text}");
-                                if text.trim().is_empty() {
+                                if text.trim().is_empty() && no_model {
+                                    set_shared_status(&shared, NO_MODEL_STATUS);
+                                } else if text.trim().is_empty() {
                                     set_shared_status(
                                         &shared,
                                         lailaisay_stt::empty_speech_status(&stats),
@@ -359,6 +379,25 @@ mod tests {
         assert_eq!(st.cached_model_path(), Some(&b));
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn no_model_status_tracks_placeholder_stt() {
+        let mut st = SharedState::from_context(empty_ctx());
+        st.stt_note = "dummy (no model file)".into();
+        assert!(st.stt_is_placeholder());
+        st.set_status(NO_MODEL_STATUS);
+        st.clear_no_model_status();
+        assert_eq!(st.status, NO_MODEL_STATUS, "still no model → keep hint");
+
+        st.stt_note = "resident: /tmp/ggml-small.bin".into();
+        assert!(!st.stt_is_placeholder());
+        st.clear_no_model_status();
+        assert_eq!(st.status, "idle");
+
+        st.set_status("copied");
+        st.clear_no_model_status();
+        assert_eq!(st.status, "copied", "only the no-model hint is cleared");
     }
 
     #[test]

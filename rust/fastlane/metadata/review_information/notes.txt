@@ -2,12 +2,14 @@ lailaisay is a press-and-hold voice dictation utility for macOS. No account or s
 
 HOW TO TEST
 1. Launch the app and allow Microphone access when prompted.
-2. In Settings → 語音模型 (Speech Model), pick a Whisper model (we recommend "tiny" or "base", about 75–150 MB). The model is downloaded once from huggingface.co and stored inside the app's sandbox container.
+2. In Settings → 語音模型 (Speech Model), under 目錄下載 (Catalog download) keep "small" (about 466 MB) selected and click 下載所選 (Download selected). The model is downloaded once from huggingface.co into the app's sandbox container and becomes active automatically when the download finishes (the line 目前載入 shows ggml-small.bin).
 3. Open any app with a text field (e.g. TextEdit or Notes).
 4. Press and HOLD ⌘⇧Space, speak (Traditional Chinese or English), then release.
-5. The status changes to 已複製 (Copied). Press ⌘V to paste the recognized text.
+5. The status in the Settings window changes to a green 已複製 (Copied). Press ⌘V to paste the recognized text.
 
-Speech recognition runs entirely on-device with whisper.cpp (Metal). The optional "AI 潤稿" (AI polish) feature is OFF by default and only works if the user enters their own Groq/Gemini API key or points to a local Ollama server.
+If you dictate before a model is downloaded, the status shows 需要語音模型 (Speech model needed) with a pointer to the 語音模型 pane.
+
+Speech recognition runs entirely on-device with whisper.cpp (Metal). The optional "AI 潤稿" (AI polish) feature is OFF by default in this build and only works if the user enters their own Groq/Gemini API key or points to a local Ollama server. If a configured polish service is unreachable, the recognized text is still copied and the status stays green.
 
 SANDBOX ENTITLEMENTS
 - com.apple.security.device.audio-input: microphone recording while the hotkey is held.
