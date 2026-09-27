@@ -283,7 +283,13 @@ impl LailaisayHost {
                 let _ = self.save_dictionary();
             }
             FormAction::PromoteLast => self.promote_last_correction(),
-            FormAction::RefreshOllama => self.refresh_ollama_models(),
+            FormAction::RefreshOllama => {
+                // Only reachable from the polish pane; guarded so the App
+                // Store build never contacts Ollama even in principle.
+                if crate::settings_ui::ai_polish_supported() {
+                    self.refresh_ollama_models();
+                }
+            }
             FormAction::CopyLastRaw => self.copy_last_raw(),
             FormAction::RevealDictionary => self.reveal_dictionary(),
             FormAction::ReloadDictionary => self.reload_dictionary(),

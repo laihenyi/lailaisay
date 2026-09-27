@@ -20,11 +20,11 @@ pub struct AppContext {
     pub paste_target: Option<PasteTarget>,
 }
 
-/// First launch of the Mac App Store build: no LLM polish until the user
-/// configures a provider. The sandboxed build cannot assume a local Ollama,
-/// and a missing provider must not surface as an error on the first dictation.
-/// Developer ID / Windows defaults are unchanged.
-pub fn apply_first_run_distribution_defaults(settings: &mut LailaisaySettings) {
+/// The Mac App Store build ships no LLM polish at all: dictation stays fully
+/// local, so no user data is ever sent to a third-party AI service. Enforced
+/// on every launch so a settings file carried over from another distribution
+/// cannot enable it. Developer ID / Windows builds are unchanged.
+pub fn apply_distribution_defaults(settings: &mut LailaisaySettings) {
     if lailaisay_paste::is_app_store_build() {
         settings.ai_enhancement_mode = lailaisay_core::AiEnhancementMode::Off;
     }
@@ -54,9 +54,7 @@ pub fn load_app_context() -> Result<AppContext> {
     // Existing file → onboarding complete so minimize-to-tray is honored.
     // Missing / unreadable file stays first-run (Settings opens once).
     let mut settings = LailaisaySettings::for_launch(&path);
-    if !path.exists() {
-        apply_first_run_distribution_defaults(&mut settings);
-    }
+    apply_distribution_defaults(&mut settings);
     if let Some((old, next)) = settings.apply_whisper_model_remap() {
         let reason = if old.contains(lailaisay_core::LEGACY_MACOS_SUPPORT_NAME) {
             lailaisay_core::LEGACY_MACOS_SUPPORT_NAME
@@ -677,9 +675,12 @@ mod status_tests {
     }
 
     #[test]
-    fn first_run_defaults_turn_polish_off_only_for_app_store() {
+    fn distribution_defaults_turn_polish_off_only_for_app_store() {
+        // Even a settings file that asked for polish must stay local in the
+        // App Store build.
         let mut s = LailaisaySettings::default();
-        apply_first_run_distribution_defaults(&mut s);
+        s.ai_enhancement_mode = lailaisay_core::AiEnhancementMode::Smart;
+        apply_distribution_defaults(&mut s);
         if lailaisay_paste::is_app_store_build() {
             assert_eq!(
                 s.ai_enhancement_mode,
@@ -688,7 +689,7 @@ mod status_tests {
         } else {
             assert_eq!(
                 s.ai_enhancement_mode,
-                LailaisaySettings::default().ai_enhancement_mode
+                lailaisay_core::AiEnhancementMode::Smart
             );
         }
     }

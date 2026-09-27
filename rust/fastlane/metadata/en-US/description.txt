@@ -4,7 +4,6 @@ Features
 • Fully offline speech recognition: whisper.cpp with Metal acceleration on Apple Silicon. Audio never leaves your computer.
 • Built for Traditional Chinese: Taiwan-style characters, punctuation, number and list shaping, filler-word removal. English and mixed-language input work too.
 • Custom dictionary and phonetic corrections for names, products and jargon.
-• Optional AI polish through Ollama (local), Groq or Gemini. Off by default; you configure it.
 • Choose your model, from tiny to large-v3-turbo.
 • Configurable hotkey with hold-to-talk and double-tap lock.
 
@@ -15,4 +14,4 @@ How it works
 4. Press ⌘V in any text field
 
 Privacy
-Recognition runs entirely on your Mac. Text is sent to a third party only if you enable Groq or Gemini polish yourself.
+Recognition runs entirely on your Mac. No recording and no text is ever sent to any AI service; the only network connection this app makes is downloading speech model files from Hugging Face.

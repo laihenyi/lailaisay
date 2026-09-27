@@ -1,7 +1,10 @@
 lailaisay is a press-and-hold voice dictation utility for macOS. No account or sign-in is required. It is a menu bar app (LSUIElement) with a Dock icon; the settings window opens from the menu bar icon → 設定 (Settings), or automatically on first launch.
 
+CHANGES IN BUILD 5 (response to the 5.1.1(i)/5.1.2(i) review of build 4)
+This build REMOVES the optional AI polish (「AI 潤稿」) feature from the Mac App Store build entirely: the settings pane is gone and the pipeline forces polish off, so the app contains no third-party AI service and never sends any user data to one. Speech recognition runs fully on-device with the bundled whisper.cpp; the app's only network connection is the one-time Whisper model download from huggingface.co, which carries no personal data. The App Privacy answers ("Data Not Collected") are therefore accurate. The AI polish feature remains available only in the direct-download (Developer ID) build, where the user configures it explicitly; the privacy policy at the URL below now states the App Store distinction explicitly.
+
 CHANGES IN BUILD 4 (response to the 2.1(a) review of build 3)
-In build 3 the recognized text was already copied to the clipboard, but the optional AI polish tried to reach a local Ollama server, and its "Ollama unavailable" note replaced the status with a red error. Build 4 fixes this: AI polish is off by default, a successful copy always shows a green 已複製 (Copied), and dictating before a model is downloaded shows 需要語音模型 (Speech model needed) instead of an error.
+In build 3 the recognized text was already copied to the clipboard, but the optional AI polish tried to reach a local Ollama server, and its "Ollama unavailable" note replaced the status with a red error. Build 4 fixed this: AI polish was turned off by default, a successful copy always showed a green 已複製 (Copied), and dictating before a model was downloaded showed 需要語音模型 (Speech model needed) instead of an error.
 
 HOW TO TEST
 1. Launch the app and allow Microphone access when prompted.
@@ -12,11 +15,11 @@ HOW TO TEST
 
 If you dictate before a model is downloaded, the status shows 需要語音模型 (Speech model needed) with a pointer to the 語音模型 pane.
 
-Speech recognition runs entirely on-device with whisper.cpp (Metal). The optional "AI 潤稿" (AI polish) feature is OFF by default in this build and only works if the user enters their own Groq/Gemini API key or points to a local Ollama server. If a configured polish service is unreachable, the recognized text is still copied and the status stays green.
+Speech recognition runs entirely on-device with whisper.cpp (Metal). The Mac App Store build has no AI polish feature and sends no data to any AI service. If dictation produces no speech, the status still stays green.
 
 SANDBOX ENTITLEMENTS
 - com.apple.security.device.audio-input: microphone recording while the hotkey is held.
-- com.apple.security.network.client: one-time Whisper model download from huggingface.co; optional user-configured Groq/Gemini/Ollama text polish.
+- com.apple.security.network.client: one-time Whisper model download from huggingface.co (the app's only network use).
 - com.apple.security.files.user-selected.read-only: importing a custom-dictionary JSON file chosen by the user in an Open panel.
 
 Global hotkey uses Carbon RegisterEventHotKey (no Accessibility / Input Monitoring permission). Output is clipboard-only in the App Store build; the app never injects keystrokes into other apps.

@@ -528,6 +528,9 @@ impl SettingsForm {
                 ui.spacing_mut().item_spacing.y = 4.0;
                 ui.add_space(4.0);
                 for section in SettingsSection::ALL {
+                    if section == SettingsSection::Ai && !ai_polish_supported() {
+                        continue;
+                    }
                     if rail_item(ui, section.label(), self.pane == section).clicked() {
                         self.pane = section;
                     }
@@ -560,7 +563,13 @@ impl SettingsForm {
         let action = match self.pane {
             SettingsSection::General => self.show_general(ui),
             SettingsSection::Whisper => self.show_whisper(ui, view.stt_note),
-            SettingsSection::Ai => self.show_ai(ui, view),
+            // Unreachable when polish is hidden (the rail skips Ai), but kept
+            // as a guard so no code path can surface the pane.
+            SettingsSection::Ai if ai_polish_supported() => self.show_ai(ui, view),
+            SettingsSection::Ai => {
+                self.show_general(ui);
+                FormAction::None
+            }
             SettingsSection::Dict => self.show_dictionary(ui),
             SettingsSection::Perms => {
                 self.show_permissions(ui);
@@ -2082,6 +2091,14 @@ pub fn speak_to_edit_supported() -> bool {
     !lailaisay_paste::is_app_store_build()
 }
 
+/// The App Store build contains no third-party AI service: the polish pane is
+/// hidden and the pipeline forces polish off, so no user data ever leaves the
+/// device. Remote providers remain available in the Developer ID / Windows
+/// builds, where the user configures them explicitly.
+pub fn ai_polish_supported() -> bool {
+    !lailaisay_paste::is_app_store_build()
+}
+
 pub fn status_appearance(status: &str) -> (String, Color32) {
     let s = status.to_ascii_lowercase();
     if s.contains("record") {
@@ -2836,6 +2853,15 @@ mod tests {
     }
 
     #[test]
+    fn ai_polish_hidden_only_in_app_store_build() {
+        assert_eq!(
+            ai_polish_supported(),
+            !cfg!(feature = "appstore"),
+            "App Store build must contain no third-party AI service"
+        );
+    }
+
+    #[test]
     fn no_model_status_points_to_model_pane() {
         let (label, color) = status_appearance(crate::shared::NO_MODEL_STATUS);
         assert_eq!(label, "需要語音模型");
@@ -3557,6 +3583,11 @@ mod tests {
 
     #[test]
     fn gemini_ai_pane_shows_api_key_field() {
+        if !ai_polish_supported() {
+            // The App Store build hides the pane entirely; coverage lives in
+            // ai_polish_hidden_only_in_app_store_build.
+            return;
+        }
         let size = design_size();
         let ctx = egui::Context::default();
         theme::apply_visuals(&ctx);
@@ -3578,6 +3609,9 @@ mod tests {
 
     #[test]
     fn groq_ai_pane_shows_api_key_field() {
+        if !ai_polish_supported() {
+            return; // pane hidden in the App Store build
+        }
         let size = design_size();
         let ctx = egui::Context::default();
         theme::apply_visuals(&ctx);
@@ -3704,13 +3738,15 @@ mod tests {
         theme::apply_visuals(&ctx);
 
         let mut form = SettingsForm::from_settings(&LailaisaySettings::default());
-        let panes = [
+        // The polish pane only exists where AI polish is supported.
+        let mut panes = vec![
             (SettingsSection::General, "一般"),
             (SettingsSection::Whisper, "語音模型"),
             (SettingsSection::Ai, "AI 潤稿"),
             (SettingsSection::Dict, "自訂辭典"),
             (SettingsSection::Perms, "系統權限"),
         ];
+        panes.retain(|(pane, _)| *pane != SettingsSection::Ai || ai_polish_supported());
 
         let mut overflow = Vec::new();
         for (pane, heading) in panes {

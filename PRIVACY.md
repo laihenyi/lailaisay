@@ -1,6 +1,6 @@
 # lailaisay 隱私權政策 / Privacy Policy
 
-生效日期 / Effective date: 2026-09-21
+生效日期 / Effective date: 2026-09-27
 
 lailaisay 是一款在你的電腦上執行的語音輸入工具。本政策說明 lailaisay 如何處理你的資料。
 lailaisay is a voice dictation tool that runs on your computer. This policy explains how lailaisay handles your data.
@@ -26,11 +26,14 @@ Settings, custom dictionaries, and correction history are stored only in your us
 
 ## 4. 網路連線 / Network connections
 
-lailaisay 只在下列情況使用網路 / lailaisay uses the network only in these cases:
+**Mac App Store 版本不包含任何 AI 潤稿功能，不會把你的錄音、文字或任何資料傳送給任何 AI 服務。此版本唯一的網路連線是下載語音模型檔。**
+**The Mac App Store version contains no AI polish feature and never sends your recordings, text, or any other data to any AI service. Its only network connection is downloading speech model files.**
+
+lailaisay（直接下載版）只在下列情況使用網路 / the direct-download version uses the network only in these cases:
 
 - **下載語音模型 / Model downloads**：首次使用時，從 Hugging Face（`huggingface.co`）下載 Whisper 模型檔。此連線只傳送一般的下載請求，不含你的個人資料。
   On first use, Whisper model files are downloaded from Hugging Face (`huggingface.co`). This request contains no personal data.
-- **可選的 AI 潤稿 / Optional AI polish**：此功能預設關閉。若你自行啟用並提供 API 金鑰，辨識出的**文字**（不含錄音）會傳送給你選擇的服務商處理：
+- **可選的 AI 潤稿 / Optional AI polish（僅直接下載版 / direct-download version only）**：此功能預設關閉。若你自行啟用並提供 API 金鑰，辨識出的**文字**（不含錄音）會傳送給你選擇的服務商處理：
   This feature is off by default. If you enable it and supply your own API key, the recognized **text** (never the audio) is sent to the provider you choose:
   - Groq（`api.groq.com`）— 適用 [Groq 隱私權政策](https://groq.com/privacy-policy/) / subject to Groq's privacy policy
   - Google Gemini（`generativelanguage.googleapis.com`）— 適用 [Google 隱私權政策](https://policies.google.com/privacy) / subject to Google's privacy policy

@@ -102,6 +102,9 @@ rust/fastlane/screenshots/zh-Hant/*.png
 | 2026-09-25 | 1.0 (3) | **被拒** 2.1(a)：「嘗試聽寫時出現錯誤訊息」（MacBook Air M3、macOS 27.0）。本機全新沙盒重現：預設 AI 潤稿 Smart + Ollama，審核機沒有 Ollama，文字其實已複製，但狀態列被「Ollama unavailable — local filters only」蓋掉並顯示紅色「錯誤」 |
 | 2026-09-26 | 1.0 (4) | 修法：成功貼上／複製的狀態優先（`copied; <附註>` 顯示綠色已複製）；App Store 版首次安裝預設關閉 AI 潤稿；無模型時顯示「需要語音模型」與指引；無模型時下載完成自動啟用；沙盒讀不到選取文字，App Store 版隱藏「選取改寫」並不註冊 ⌥⇧Space。build 4 送審，審查備註同步更新 |
 | 2026-09-26 | 1.0 (4) | `fastlane mac beta` 上傳；Apple 處理約 70 分鐘後 VALID，上傳紀錄無警告（ITMS-90886 已解）。API 綁定 build 4、API 更新審查備註，網頁「更新審查內容 → 重新提交至 App 審查」重送；狀態 WAITING_FOR_REVIEW |
+| 2026-09-27 | 1.0 (4) | **被拒** 5.1.1(i)／5.1.2(i)：App「似乎」會把個人資料送給第三方 AI 服務，但未事先揭露資料內容與接收方、未取得同意、隱私政策未載明 |
+| 2026-09-27 | 1.0 (5) | 修法（走 Apple 的「不含第三方 AI 服務」路徑）：App Store 版整個移除 AI 潤稿——設定頁隱藏「AI 潤稿」（`ai_polish_supported()`）、每次啟動強制 `ai_enhancement_mode=Off`（`apply_distribution_defaults`）、RefreshOllama 防禦性擋下；商店描述（zh-Hant/en-US）刪除 AI 潤稿宣傳並明寫唯一網路連線是模型下載；PRIVACY.md 加 Mac App Store 版不傳資料聲明；entitlements 註解同步。build 5 打包上傳，處理約 2 分鐘即 VALID（無警告），API 綁定 build 5 並 PATCH 審查備註 |
+| 2026-09-27 | 1.0 (5) | 重送：被拒狀態下 Resolution Center 訊息線（submission details 頁「訊息」區）**沒有開發者回覆輸入框**（被拒與 DEVELOPER_REJECTED 狀態下 DOM 皆確認無 textarea／回覆按鈕；4 則訊息全是 Apple 來信）——Apple 信中要求的「reply to this rejection to confirm」實務上只能靠審查備註（App Review Information）承載，BUILD 5 段已完整聲明不含第三方 AI 服務。途中曾以版本頁「將此版本從審查中移除」實驗找回覆框（版本回 DEVELOPER_REJECTED），確認無果後「重新提交審查 → 提交以供審查（1.0 (5)）」重送，狀態 WAITING_FOR_REVIEW |
 
 ### 5.4 之後每次更新的標準流程
 
@@ -113,7 +116,7 @@ rust/fastlane/screenshots/zh-Hant/*.png
 6. 等 build 狀態變 VALID（API `/v1/builds?filter[app]=6814312066`，通常 1–5 分鐘），再 `fastlane mac submit_review`。
 7. 審核通過後因設定為手動發佈，需到 App Store Connect 版本頁按「發佈此版本」，或改 Fastfile `automatic_release: true`。
 8. 提交 `macos/Info.plist`、metadata 的變更到 git。
-9. **被拒後重送**：修正後 `CFBundleVersion` 遞增、`fastlane mac beta` 上傳新 build；`fastlane mac submit_review` 會選到新 build 但因舊的 review submission 仍在 UNRESOLVED_ISSUES 而失敗，API PATCH `submitted=true` 也回「Version is not ready」。新 build 可用 API `PATCH /v1/appStoreVersions/{versionId}/relationships/build` 綁定，再到版本頁按「更新審查內容」→「重新提交至 App 審查」（Claude in Chrome 可代操作）。
+9. **被拒後重送**：修正後 `CFBundleVersion` 遞增、`fastlane mac beta` 上傳新 build；`fastlane mac submit_review` 會選到新 build 但因舊的 review submission 仍在 UNRESOLVED_ISSUES 而失敗，API PATCH `submitted=true` 也回「Version is not ready」。新 build 可用 API `PATCH /v1/appStoreVersions/{versionId}/relationships/build` 綁定，再到版本頁按「更新審查內容」→「重新提交至 App 審查」（Claude in Chrome 可代操作）。要回覆 Apple 拒審訊息時注意：submission details 頁的「訊息」區**沒有回覆輸入框**（2026-09-27 於被拒與 DEVELOPER_REJECTED 狀態皆確認），回覆內容寫進審查備註（App Review Information）即可，審核員重審時以此為準。
 
 送審前檢查私有 API：`nm -u dist/lailaisay.app/Contents/MacOS/lailaisay-app | grep -E 'CGS|SLS'` 應為空（`CGShieldingWindowLevel` 是公開 API，可忽略）。升級 eframe/winit 時要重新套用 `vendor/winit` 的修改。
 
