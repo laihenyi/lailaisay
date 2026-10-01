@@ -105,6 +105,7 @@ rust/fastlane/screenshots/zh-Hant/*.png
 | 2026-09-27 | 1.0 (4) | **被拒** 5.1.1(i)／5.1.2(i)：App「似乎」會把個人資料送給第三方 AI 服務，但未事先揭露資料內容與接收方、未取得同意、隱私政策未載明 |
 | 2026-09-27 | 1.0 (5) | 修法（走 Apple 的「不含第三方 AI 服務」路徑）：App Store 版整個移除 AI 潤稿——設定頁隱藏「AI 潤稿」（`ai_polish_supported()`）、每次啟動強制 `ai_enhancement_mode=Off`（`apply_distribution_defaults`）、RefreshOllama 防禦性擋下；商店描述（zh-Hant/en-US）刪除 AI 潤稿宣傳並明寫唯一網路連線是模型下載；PRIVACY.md 加 Mac App Store 版不傳資料聲明；entitlements 註解同步。build 5 打包上傳，處理約 2 分鐘即 VALID（無警告），API 綁定 build 5 並 PATCH 審查備註 |
 | 2026-09-27 | 1.0 (5) | 重送：被拒狀態下 Resolution Center 訊息線（submission details 頁「訊息」區）**沒有開發者回覆輸入框**（被拒與 DEVELOPER_REJECTED 狀態下 DOM 皆確認無 textarea／回覆按鈕；4 則訊息全是 Apple 來信）——Apple 信中要求的「reply to this rejection to confirm」實務上只能靠審查備註（App Review Information）承載，BUILD 5 段已完整聲明不含第三方 AI 服務。途中曾以版本頁「將此版本從審查中移除」實驗找回覆框（版本回 DEVELOPER_REJECTED），確認無果後「重新提交審查 → 提交以供審查（1.0 (5)）」重送，狀態 WAITING_FOR_REVIEW |
+| 2026-10-02 | 1.0 (5) | **已上架**：ASC API `appStoreState=READY_FOR_SALE`（手動發佈已完成）。同日處理 Apple「Developer ID Sub-CA 2027-02-01 到期」通知：以 Account Holder 網頁建立 G2 Developer ID Application 憑證（API 建立回 403）、本機鑰匙圈刪除舊憑證（`developerID_2022.p12` 已備份）、`package-macos-app.sh --developer-id` + `notarize-macos.sh` 實跑通過（notarytool Accepted `bc5d6771-efe9-4477-ba42-14d73399101c`、staple OK、`spctl` = Notarized Developer ID）。Developer Portal 上的舊憑證刻意不撤銷，讓它自然到期 |
 
 ### 5.4 之後每次更新的標準流程
 
