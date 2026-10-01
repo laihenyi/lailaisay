@@ -176,5 +176,7 @@ xcrun altool --upload-app   -f dist/lailaisay.pkg -t macos \
 | Apple Distribution | 2026/12/08 |
 | 3rd Party Mac Developer Application 與 Provisioning Profile | 2027/07/21 |
 | 3rd Party Mac Developer Installer | 2027/09/21 |
+| Developer ID Application（舊 Sub-CA，`69NQSK3F34`；`Y55MNG5ZHP` 2027/01/11 私鑰不在本機） | 2027/02/01 起失效，已由 G2 版取代；舊簽署並公證的 App 不受影響 |
+| Developer ID Application G2（`FQRSNHSGW9`，SHA-1 `59AB8A1C…0032156`，2026-10-02 建立，鑰匙圈已匯入） | 2031/09/17（Apple 通知稱 G2 憑證每年需更新，以 Developer Portal 顯示為準） |
 
 到期後重新申請憑證，並在 Developer Portal 重新產生 profile 覆蓋 `macos/lailaisay-appstore.provisionprofile`。

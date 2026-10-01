@@ -14,7 +14,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-DEFAULT_IDENTITY="Developer ID Application: Henyi Lai (S6EDV86VSB)"
+# SHA-1 of the G2 Sub-CA certificate (issued 2026-10-02, expires 2031-09-17). A name is ambiguous while the
+# old Sub-CA certificate (expires 2027-02-01) is still in the keychain.
+DEFAULT_IDENTITY="59AB8A1C4CFF401054F0D3CE0287208BB0032156"
 TEAM_ID="S6EDV86VSB"
 ENTITLEMENTS="$ROOT/macos/lailaisay.entitlements"
 DIST="$ROOT/dist"

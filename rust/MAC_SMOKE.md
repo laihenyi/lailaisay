@@ -24,7 +24,7 @@ The App Store build is a separate, sandboxed variant (`cargo --features appstore
 
 ## Outside App Store: Developer ID + notarization
 
-Distribute `lailaisay.app` outside the Mac App Store with a **Developer ID Application** signature and Apple notarization. Team ID `S6EDV86VSB`. Default identity: `Developer ID Application: Henyi Lai (S6EDV86VSB)`.
+Distribute `lailaisay.app` outside the Mac App Store with a **Developer ID Application** signature and Apple notarization. Team ID `S6EDV86VSB`. Default identity: the G2 Sub-CA certificate, selected by SHA-1 `59AB8A1C4CFF401054F0D3CE0287208BB0032156` (the name alone is ambiguous while the old Sub-CA certificate is in the keychain).
 
 This path enables the **Hardened Runtime** and does **not** enable App Sandbox. Sandbox would block the global CGEvent tap (Accessibility / Input Monitoring), paste into other apps (AX / CGEvent / System Events), and the existing Documents plus `~/Library/Application Support/com.yikai.lailaisay` paths. Entitlements live in [`macos/lailaisay.entitlements`](macos/lailaisay.entitlements) (audio-input and Apple Events only).
 
@@ -36,7 +36,7 @@ Do not commit `.p8` keys, passwords, or Issuer secrets.
 cd rust
 ./scripts/package-macos-app.sh
 # optional offline Developer ID sign (no notarytool, no timestamp server):
-CODESIGN_IDENTITY="Developer ID Application: Henyi Lai (S6EDV86VSB)" \
+CODESIGN_IDENTITY="59AB8A1C4CFF401054F0D3CE0287208BB0032156" \
   ./scripts/package-macos-app.sh --developer-id
 ```
 
