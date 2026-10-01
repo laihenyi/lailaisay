@@ -181,3 +181,5 @@ xcrun altool --upload-app   -f dist/lailaisay.pkg -t macos \
 | Developer ID Application G2（`FQRSNHSGW9`，SHA-1 `59AB8A1C…0032156`，2026-10-02 建立，鑰匙圈已匯入） | 2031/09/17（Apple 通知稱 G2 憑證每年需更新，以 Developer Portal 顯示為準） |
 
 到期後重新申請憑證，並在 Developer Portal 重新產生 profile 覆蓋 `macos/lailaisay-appstore.provisionprofile`。
+
+備註（2026-10-02 盤點）：帳號上 2026/12/06～12/09 到期的 Distribution Managed、Distribution、Development 不是 lailaisay 使用（App Store 簽署用 Mac App Distribution 與 Mac Installer），屬其他專案（如 PilotApp iOS）；已上架 App 不受影響，但下次出 iOS 版本前需先更新，Xcode 自動管理（Managed）的不要手動撤銷。舊 Developer ID（2027/01/11、2027/02/02）不撤銷，自然到期。
