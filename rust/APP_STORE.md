@@ -114,15 +114,48 @@ rust/fastlane/screenshots/zh-Hant/*.png
 3. App Store Connect 若沒有該行銷版本的紀錄，`fastlane mac release` 會自動建立；`metadata/*/release_notes.txt` 改成本版新增功能。
 4. `./scripts/package-macos-app.sh --app-store` → `dist/lailaisay.pkg`。
 5. `fastlane mac release`（上傳 pkg + metadata + 截圖；截圖沒變也會重傳）。若截圖重複，用 API 刪除同檔名的重複項後再送審。
-6. 等 build 狀態變 VALID（API `/v1/builds?filter[app]=6814312066`，通常 1–5 分鐘），再 `fastlane mac submit_review`。
-7. 審核通過後因設定為手動發佈，需到 App Store Connect 版本頁按「發佈此版本」，或改 Fastfile `automatic_release: true`。
+6. 等 build 狀態變 VALID（`asc status --app 6814312066 --platform MAC_OS --watch`，或 API `/v1/builds?filter[app]=6814312066`，通常 1–5 分鐘），再 `fastlane mac submit_review`；送審前可先跑 `asc validate --app 6814312066 --version <版本> --platform MAC_OS` 看缺什麼（見 §5.5）。
+7. 審核通過後因設定為手動發佈，需到 App Store Connect 版本頁按「發佈此版本」、或 `asc versions release --version-id <versionId> --confirm`（§5.5），或改 Fastfile `automatic_release: true`。
 8. 提交 `macos/Info.plist`、metadata 的變更到 git。
-9. **被拒後重送**：修正後 `CFBundleVersion` 遞增、`fastlane mac beta` 上傳新 build；`fastlane mac submit_review` 會選到新 build 但因舊的 review submission 仍在 UNRESOLVED_ISSUES 而失敗，API PATCH `submitted=true` 也回「Version is not ready」。新 build 可用 API `PATCH /v1/appStoreVersions/{versionId}/relationships/build` 綁定，再到版本頁按「更新審查內容」→「重新提交至 App 審查」（Claude in Chrome 可代操作）。要回覆 Apple 拒審訊息時注意：submission details 頁的「訊息」區**沒有回覆輸入框**（2026-09-27 於被拒與 DEVELOPER_REJECTED 狀態皆確認），回覆內容寫進審查備註（App Review Information）即可，審核員重審時以此為準。
+9. **被拒後重送**：修正後 `CFBundleVersion` 遞增、`fastlane mac beta` 上傳新 build；`fastlane mac submit_review` 會選到新 build 但因舊的 review submission 仍在 UNRESOLVED_ISSUES 而失敗，API PATCH `submitted=true` 也回「Version is not ready」。新 build 可用 `asc review submit --app 6814312066 --platform MAC_OS --version <版本> --build-id <buildId> --confirm`（先加 `--dry-run` 預覽；§5.5）一次完成綁定與重送；或手動 API `PATCH /v1/appStoreVersions/{versionId}/relationships/build` 綁定，再到版本頁按「更新審查內容」→「重新提交至 App 審查」（Claude in Chrome 可代操作）。要回覆 Apple 拒審訊息時注意：submission details 頁的「訊息」區**沒有回覆輸入框**（2026-09-27 於被拒與 DEVELOPER_REJECTED 狀態皆確認），回覆內容寫進審查備註（App Review Information）即可，審核員重審時以此為準。
 
 送審前檢查私有 API：`nm -u dist/lailaisay.app/Contents/MacOS/lailaisay-app | grep -E 'CGS|SLS'` 應為空（`CGShieldingWindowLevel` 是公開 API，可忽略）。升級 eframe/winit 時要重新套用 `vendor/winit` 的修改。
 
 備註：`fastlane precheck` 不支援 macOS，lanes 已設 `run_precheck_before_submit: false`。`review_information/phone_number.txt` 為 git-ignored 本機檔，換機器要重建。
 
+
+### 5.5 `asc`（App Store Connect CLI）補審核生命週期
+
+2026-10-03 評估 [rorkai/App-Store-Connect-CLI](https://github.com/rorkai/App-Store-Connect-CLI)（Go 單一二進位、MIT、非 Apple 官方；`brew install asc`，本機為 5.9.1）。它和 fastlane 走同一個 App Store Connect API，不是新的上架途徑。**分工：上傳＋metadata＋截圖仍用 `fastlane mac release`**（已跑通五次，且 asc 的 metadata 範本沒有 copyright、類別、價格、年齡分級欄位，格式是每語系一個 JSON，不能直接沿用 `fastlane/metadata`）；**審核生命週期、診斷與發佈改用 `asc`**，取代 §5.4 第 9 點手刻的 API PATCH 與網頁點擊。
+
+一次性設定（金鑰存系統鑰匙圈，需在本機終端機自行執行；遙測預設開啟，建議關閉）：
+
+```sh
+asc telemetry disable
+asc auth login --name lailaisay --key-id 7AXGRN3B24 \
+  --issuer-id 69a6de7f-8267-47e3-e053-5b8c7c11a4d1 \
+  --private-key ./AuthKey_7AXGRN3B24.p8 --network
+asc auth status --validate
+export ASC_APP_ID=6814312066   # 之後可省略 --app
+```
+
+常用命令（都支援 `--output table|json|markdown`；會寫入的命令需 `--confirm`，可先 `--dry-run`）：
+
+| 情境 | 命令 |
+| --- | --- |
+| 看整體狀態／盯 build 處理 | `asc status --app 6814312066 --platform MAC_OS [--watch --poll-interval 30s]` |
+| 送審前自檢（長度、截圖、價格、年齡分級、build 是否綁定） | `asc validate --app 6814312066 --version 1.1 --platform MAC_OS` |
+| 為何不能送審／被拒後的阻礙 | `asc review doctor --app 6814312066 --platform MAC_OS`、`asc review status --app 6814312066` |
+| 列 build 取 buildId | `asc builds list --app 6814312066 --output table` |
+| 列版本取 versionId | `asc versions list --app 6814312066 --platform MAC_OS --output table` |
+| 被拒後綁定新 build 並重送（attach-build → submissions-create → items-add → submissions-submit） | `asc review submit --app 6814312066 --platform MAC_OS --version 1.1 --build-id <buildId> --dry-run`，確認後改 `--confirm` |
+| 更新審查備註（回覆拒審說明寫這裡，Resolution Center 沒有回覆框） | `asc review details-for-version --version-id <versionId>` 取 DETAIL_ID，再 `asc review details-update --id <DETAIL_ID> --notes "…"` |
+| 舊 submission 卡 UNRESOLVED_ISSUES | `asc review submissions list --app 6814312066`、`asc review items list --submission <id>`、`asc review items update --id <itemId> --resolved true` 或 `asc review submissions-update --id <id> --canceled=true --confirm` |
+| 審核通過後手動發佈 | `asc versions release --version-id <versionId> --confirm` |
+| 截圖本機預檢／補傳單一語系（例如 en-US） | `asc screenshots validate --path fastlane/screenshots/zh-Hant --device-type APP_DESKTOP`；`asc screenshots upload --app 6814312066 --version 1.1 --locale en-US --path fastlane/screenshots/en-US --device-type APP_DESKTOP --skip-existing` |
+| 任意 API | `asc api GET /v1/apps/6814312066/appStoreVersions --query 'filter[platform]=MAC_OS'`、`asc api PATCH … --confirm --body-file x.json` |
+
+驗證狀態（2026-10-03，已 `asc auth login` 存鑰匙圈，`asc auth status --validate` = works）：對真實帳號實跑過的唯讀命令——`status --platform MAC_OS`（health green、build 5 VALID、版本 1.0 READY_FOR_DISTRIBUTION）、`review status`／`review doctor`（reviewState COMPLETE、0 blocker）、`validate --version 1.0`（1 error 為版本已 READY_FOR_DISTRIBUTION 不可編輯，屬預期；另 2 則 info：手動發佈、App Privacy 狀態 API 查不到）、`review submissions list`（列出 09-25／09-27 三筆 COMPLETE）、`review details-for-version`（讀到 fastlane 寫入的審查備註與聯絡人）、`versions list`。固定 ID：版本 1.0 `57694106-8041-4b31-8848-f2964d111a46`、審查詳情 `478b876f-e0c4-45ff-9ca5-3cb7898ce533`、build 5 `5a879417-a521-44d4-9bb3-64fc8596cd4f`。`screenshots validate --device-type APP_DESKTOP` 以現有 5 張 1440×900 截圖跑過，0 錯誤 0 警告。**尚未實跑（會寫入）**：`builds upload --pkg`（下次有新 build 先只傳 TestFlight 驗證，再決定是否取代 `fastlane mac beta`）、`review submit` 在 UNRESOLVED_ISSUES 狀態的行為。注意 `asc publish appstore --pkg` 需手填 `--version` 與 `--build-number`，沒有 `fastlane mac check_version` 的遞增防呆，因此上傳仍以 fastlane 為主。
 
 ### 5.1 打包（建置 + 簽署 + pkg）
 
@@ -152,7 +185,7 @@ fastlane mac release         # 上傳 pkg + metadata，不送審
 fastlane mac submit_review   # 送審
 ```
 
-不用 fastlane 時，可用 Transporter.app 或：
+不用 fastlane 時，可用 `asc builds upload --app 6814312066 --pkg dist/lailaisay.pkg --version <版本> --build-number <build> --wait`（§5.5，上傳 pkg 尚未實測）、Transporter.app 或：
 
 ```sh
 xcrun altool --validate-app -f dist/lailaisay.pkg -t macos \
