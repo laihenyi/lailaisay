@@ -168,6 +168,7 @@ pub async fn run_text_pipeline(
     ctx: &AppContext,
     paste: bool,
 ) -> Result<TextPipelineOutcome> {
+    let t_local = std::time::Instant::now();
     let local = post_process(
         &transcript.text,
         PostProcessOptions {
@@ -178,7 +179,9 @@ pub async fn run_text_pipeline(
         },
     );
     tracing::info!(?local, "local pipeline");
+    let local_ms = t_local.elapsed().as_millis();
 
+    let t_enhance = std::time::Instant::now();
     let vocab = ctx.dictionary.polish_vocabulary_block();
     let outcome = enhance_with_note_vocab(
         &local,
@@ -197,6 +200,8 @@ pub async fn run_text_pipeline(
     if let Some(note) = &outcome.note {
         tracing::warn!("{note}");
     }
+
+    let enhance_ms = t_enhance.elapsed().as_millis();
 
     // Post-LLM local term correction (dictionary + glossary), then numeral norms.
     // Proper nouns the model rewrote are restored; 國字 numerals become Arabic.
@@ -220,6 +225,8 @@ pub async fn run_text_pipeline(
             note = Some("no speech".into());
         }
     }
+    let t_paste = std::time::Instant::now();
+    let did_paste = paste && !polished.trim().is_empty();
     if paste && !polished.trim().is_empty() {
         match lailaisay_paste::paste_text_to(&polished, &ctx.settings, ctx.paste_target.as_ref()) {
             Ok(()) => {
@@ -253,6 +260,13 @@ pub async fn run_text_pipeline(
             }
         }
     }
+    tracing::info!(
+        target: "timing",
+        local_ms,
+        enhance_ms,
+        paste_ms = if did_paste { t_paste.elapsed().as_millis() } else { 0 },
+        "[timing] pipeline"
+    );
     Ok(TextPipelineOutcome {
         local,
         polished,

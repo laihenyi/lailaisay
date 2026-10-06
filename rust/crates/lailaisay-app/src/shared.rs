@@ -244,15 +244,19 @@ pub fn spawn_worker(shared: Arc<Mutex<SharedState>>, rx: mpsc::Receiver<Work>) {
                         }
                     }
                     Work::Transcribe(pcm) => {
-                        let (stt, ctx, no_model) = {
+                        let job_started = std::time::Instant::now();
+                        let (stt, ctx, no_model, load_ms) = {
                             let mut g = shared.lock().unwrap_or_else(|e| e.into_inner());
+                            let t = std::time::Instant::now();
                             g.ensure_stt();
-                            (g.stt.clone(), g.app_context(), g.stt_is_placeholder())
+                            let load_ms = t.elapsed().as_millis();
+                            (g.stt.clone(), g.app_context(), g.stt_is_placeholder(), load_ms)
                         };
                         let prompt = whisper_prompt(&ctx);
                         let lang = whisper_decode_language(&ctx.settings);
                         let stats =
                             lailaisay_stt::pcm_stats(&pcm, lailaisay_stt::WHISPER_SAMPLE_RATE);
+                        let stt_started = std::time::Instant::now();
                         let transcript = if let Some(stt) = stt {
                             match stt.transcribe_pcm16k(&pcm, lang.as_deref(), prompt.as_deref()) {
                                 Ok(t) => t,
@@ -268,6 +272,16 @@ pub fn spawn_worker(shared: Arc<Mutex<SharedState>>, rx: mpsc::Receiver<Work>) {
                                 None,
                             )
                         };
+                        let stt_ms = stt_started.elapsed().as_millis();
+                        let audio_s = pcm.len() as f64 / lailaisay_stt::WHISPER_SAMPLE_RATE as f64;
+                        tracing::info!(
+                            target: "timing",
+                            audio_s = format_args!("{audio_s:.2}"),
+                            model_load_ms = load_ms,
+                            stt_ms,
+                            rtf = format_args!("{:.2}", stt_ms as f64 / 1000.0 / audio_s.max(0.001)),
+                            "[timing] stt"
+                        );
                         if transcript.segments.len() >= 2 {
                             tracing::info!(
                                 n = transcript.segments.len(),
@@ -315,6 +329,11 @@ pub fn spawn_worker(shared: Arc<Mutex<SharedState>>, rx: mpsc::Receiver<Work>) {
                                     }
                                 }
                                 tracing::info!("result: {text}");
+                                tracing::info!(
+                                    target: "timing",
+                                    total_ms = job_started.elapsed().as_millis(),
+                                    "[timing] job total (load+stt+pipeline)"
+                                );
                                 if text.trim().is_empty() && no_model {
                                     set_shared_status(&shared, NO_MODEL_STATUS);
                                 } else if text.trim().is_empty() {

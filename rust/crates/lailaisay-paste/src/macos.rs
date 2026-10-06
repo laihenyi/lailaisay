@@ -71,6 +71,7 @@ pub fn paste_into_target(
     settings: &LailaisaySettings,
     target: Option<&PasteTarget>,
 ) -> Result<()> {
+    let paste_started = std::time::Instant::now();
     copy_text(text)?;
     eprintln!(
         "[lailaisay-paste] clipboard written=true ({} chars)",
@@ -78,17 +79,26 @@ pub fn paste_into_target(
     );
     thread::sleep(Duration::from_millis(50));
 
+    let mut current = frontmost_bundle_id();
     if let Some(t) = target.filter(|t| !t.is_empty()) {
-        eprintln!("[lailaisay-paste] restoring focus to {t}");
-        if !activate_target(t) {
-            eprintln!(
-                "[lailaisay-paste] activate failed for {t} — will still try current frontmost"
-            );
+        // Skip the focus restore (an `open -b` spawn plus a 150 ms settle) when
+        // the target already owns the frontmost slot — the common case.
+        let already_front =
+            !t.bundle_id.is_empty() && current.as_deref() == Some(t.bundle_id.as_str());
+        if already_front {
+            eprintln!("[lailaisay-paste] target {t} already frontmost — skip focus restore");
+        } else {
+            eprintln!("[lailaisay-paste] restoring focus to {t}");
+            if !activate_target(t) {
+                eprintln!(
+                    "[lailaisay-paste] activate failed for {t} — will still try current frontmost"
+                );
+            }
+            thread::sleep(Duration::from_millis(150));
+            current = frontmost_bundle_id();
         }
-        thread::sleep(Duration::from_millis(150));
     }
 
-    let current = frontmost_bundle_id();
     let bundle = target
         .map(|t| t.bundle_id.clone())
         .filter(|s| !s.is_empty())
@@ -130,6 +140,10 @@ pub fn paste_into_target(
         ));
     }
 
+    eprintln!(
+        "[lailaisay-paste] timing total={}ms",
+        paste_started.elapsed().as_millis()
+    );
     if !settings.copy_to_clipboard {
         eprintln!("[lailaisay-paste] copyToClipboard=false: previous pasteboard restore is not yet ported; text stays on clipboard");
     }
