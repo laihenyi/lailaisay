@@ -1112,9 +1112,10 @@ impl eframe::App for LailaisayHost {
 impl LailaisayHost {
     fn paint_settings(&mut self, ctx: &egui::Context) {
         crate::theme::paint_shell_frame(ctx);
-        let (stt_note, status, last_llm, last_raw, last_final) = match self.shared.lock() {
+        let (stt_note, stt_warning, status, last_llm, last_raw, last_final) = match self.shared.lock() {
             Ok(g) => (
                 g.current_stt_note(),
+                g.stt_warning.clone(),
                 g.status.clone(),
                 g.last_llm_note.clone().unwrap_or_default(),
                 g.last_stt.clone(),
@@ -1127,6 +1128,7 @@ impl LailaisayHost {
             &SettingsView {
                 live_status: &status,
                 stt_note: &stt_note,
+                stt_warning: &stt_warning,
                 last_llm: if last_llm.is_empty() {
                     None
                 } else {

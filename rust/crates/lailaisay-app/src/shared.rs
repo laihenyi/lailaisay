@@ -31,6 +31,9 @@ pub struct SharedState {
     stt: Option<Arc<dyn Transcriber>>,
     stt_path: Option<PathBuf>,
     pub stt_note: String,
+    /// Why the selected Qwen3-ASR model could not start (Whisper is used instead).
+    pub stt_warning: String,
+    qwen_failed: Option<String>,
     stt_load_count: u32,
     pub last_stt: String,
     pub last_final: String,
@@ -49,6 +52,8 @@ impl SharedState {
             stt: None,
             stt_path: None,
             stt_note: String::from("not loaded"),
+            stt_warning: String::new(),
+            qwen_failed: None,
             stt_load_count: 0,
             last_stt: String::new(),
             last_final: String::new(),
@@ -114,9 +119,12 @@ impl SharedState {
 
     /// Load whisper.cpp (or dummy) once. No-ops when the resolved path is unchanged.
     pub fn ensure_stt(&mut self) {
-        if lailaisay_stt::qwen_sidecar::requested() {
-            self.ensure_qwen_stt();
-            return;
+        if let Some(repo) = self.wanted_qwen_repo() {
+            if self.ensure_qwen_stt(&repo) {
+                return;
+            }
+        } else {
+            self.stt_warning.clear();
         }
         let want = resolve_whisper_model(&self.settings);
         if self.stt.is_some() && self.stt_path == want {
@@ -125,30 +133,48 @@ impl SharedState {
         self.load_stt(want);
     }
 
-    /// Experimental `TOK_STT_BACKEND=qwen3-mlx`: resident Python MLX worker. A failed
-    /// start falls back to the dummy backend and is not retried until a reload.
-    fn ensure_qwen_stt(&mut self) {
-        if self.stt.is_some() && self.stt_note.starts_with("qwen") {
-            return;
+    /// Qwen3-ASR repo requested by the selected model (or the developer env override).
+    fn wanted_qwen_repo(&self) -> Option<String> {
+        self.settings
+            .selected_whisper_model
+            .as_deref()
+            .and_then(lailaisay_stt::qwen_sidecar::selection_repo)
+            .map(str::to_owned)
+            .or_else(lailaisay_stt::qwen_sidecar::env_override_repo)
+    }
+
+    /// Load the Qwen3-ASR sidecar for `repo`. On failure the reason is kept in
+    /// `stt_warning` and the caller falls back to Whisper.
+    fn ensure_qwen_stt(&mut self, repo: &str) -> bool {
+        let note = format!("qwen3-asr: {repo}");
+        if self.stt.is_some() && self.stt_note == note {
+            return true;
+        }
+        if self.qwen_failed.as_deref() == Some(repo) {
+            return false;
         }
         self.stt_load_count += 1;
-        let (backend, note): (Arc<dyn Transcriber>, String) =
-            match lailaisay_stt::qwen_sidecar::QwenSidecarTranscriber::load() {
-                Ok(t) => {
-                    tracing::info!("STT resident — Qwen3-ASR sidecar");
-                    (Arc::new(t), "qwen3-asr sidecar".into())
-                }
-                Err(e) => {
-                    tracing::warn!("qwen3-asr sidecar failed ({e}); dummy STT");
-                    (dummy_backend(), format!("dummy (qwen3-asr sidecar failed: {e})"))
-                }
-            };
-        self.stt = Some(backend);
+        self.stt = None;
         self.stt_path = None;
-        self.stt_note = note;
+        match lailaisay_stt::qwen_sidecar::QwenSidecarTranscriber::load(repo) {
+            Ok(t) => {
+                tracing::info!(repo, "STT resident — Qwen3-ASR sidecar");
+                self.stt = Some(Arc::new(t));
+                self.stt_note = note;
+                self.stt_warning.clear();
+                true
+            }
+            Err(e) => {
+                tracing::warn!(repo, "qwen3-asr sidecar failed ({e}); falling back to Whisper");
+                self.stt_warning = format!("Qwen3-ASR 無法啟動，已改用 Whisper：{e}");
+                self.qwen_failed = Some(repo.to_string());
+                false
+            }
+        }
     }
 
     pub fn force_reload_stt(&mut self) {
+        self.qwen_failed = None;
         self.stt = None;
         self.stt_path = None;
         self.ensure_stt();

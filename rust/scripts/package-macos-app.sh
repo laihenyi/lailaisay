@@ -233,6 +233,10 @@ mkdir -p "$MACOS" "$RES"
 cp "$PLIST_SRC" "$APP/Contents/Info.plist"
 cp "$ROOT/crates/lailaisay-app/assets/fonts/OFL.txt" "$RES/FONT-LICENSE.txt"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
+# Qwen3-ASR sidecar worker: needs an external Python, which the App Store sandbox forbids.
+if [[ "$APP_STORE" -ne 1 ]]; then
+  cp "$ROOT/scripts/qwen3_asr_worker.py" "$RES/qwen3_asr_worker.py"
+fi
 
 ICON_SRC="$ROOT/macos/AppIcon.icns"
 if [[ -f "$ICON_SRC" ]]; then
