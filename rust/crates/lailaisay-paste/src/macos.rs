@@ -10,8 +10,7 @@ use std::time::Duration;
 use lailaisay_core::LailaisaySettings;
 
 use crate::strategy::{
-    ax_value_shows_paste, choose_strategy, cmd_v_script, fallback_after, frontmost_bundle_script,
-    is_vscode, menu_paste_script, should_attempt_second_clipboard_paste, type_text_script,
+    ax_value_shows_paste, cmd_v_script, frontmost_bundle_script, is_vscode, menu_paste_script, plan_attempts, should_attempt_second_clipboard_paste, type_text_script,
     PasteStrategy, PasteTarget,
 };
 use crate::{copy_text, PasteError, Result};
@@ -109,21 +108,40 @@ pub fn paste_into_target(
         current.as_deref().unwrap_or("?")
     );
 
-    let primary = choose_strategy(&bundle, settings.use_clipboard_paste);
-    let mut attempts = vec![primary];
-    attempts.extend_from_slice(fallback_after(primary));
+    let menu_blocked = menu_paste_blocked(&bundle);
+    let attempts = plan_attempts(&bundle, settings.use_clipboard_paste, menu_blocked);
+    if menu_blocked {
+        eprintln!("[lailaisay-paste] Edit → Paste unusable for {bundle} earlier; skipping MenuPaste");
+    }
 
     let before = snapshot_focused_field();
     let mut succeeded = false;
+    let mut menu_failed = false;
     for strategy in attempts {
+        let t_strategy = std::time::Instant::now();
         match apply_strategy(strategy, text, &bundle, &before) {
             Ok(()) => {
-                eprintln!("[lailaisay-paste] {strategy} ok bundle={bundle}");
+                eprintln!(
+                    "[lailaisay-paste] {strategy} ok bundle={bundle} in {}ms",
+                    t_strategy.elapsed().as_millis()
+                );
+                if menu_failed {
+                    remember_menu_paste_blocked(&bundle);
+                }
                 succeeded = true;
                 break;
             }
             Err(why) => {
-                eprintln!("[lailaisay-paste] {strategy} failed bundle={bundle}: {why}");
+                eprintln!(
+                    "[lailaisay-paste] {strategy} failed bundle={bundle} in {}ms: {why}",
+                    t_strategy.elapsed().as_millis()
+                );
+                // Only "menu item disabled / not found" is a stable property of the
+                // app; script errors (permissions, timeouts) may be transient.
+                if strategy == PasteStrategy::MenuPaste && why.starts_with("menu Paste not enabled")
+                {
+                    menu_failed = true;
+                }
             }
         }
     }
@@ -148,6 +166,27 @@ pub fn paste_into_target(
         eprintln!("[lailaisay-paste] copyToClipboard=false: previous pasteboard restore is not yet ported; text stays on clipboard");
     }
     Ok(())
+}
+
+/// Bundles whose Edit → Paste item was disabled/missing, learned this run.
+static MENU_PASTE_BLOCKED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+fn menu_paste_blocked(bundle: &str) -> bool {
+    MENU_PASTE_BLOCKED
+        .lock()
+        .map(|v| v.iter().any(|b| b == bundle))
+        .unwrap_or(false)
+}
+
+fn remember_menu_paste_blocked(bundle: &str) {
+    if bundle.is_empty() {
+        return;
+    }
+    if let Ok(mut v) = MENU_PASTE_BLOCKED.lock() {
+        if !v.iter().any(|b| b == bundle) {
+            v.push(bundle.to_string());
+        }
+    }
 }
 
 pub fn capture_frontmost_target() -> Option<PasteTarget> {

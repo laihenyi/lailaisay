@@ -181,6 +181,23 @@ pub fn fallback_after(primary: PasteStrategy) -> &'static [PasteStrategy] {
     }
 }
 
+/// Ordered attempts for one paste. `menu_blocked` is true when Edit → Paste
+/// already proved unusable for this app (disabled or missing), so the
+/// osascript round trip is skipped and the fallbacks run directly.
+pub fn plan_attempts(
+    bundle_id: &str,
+    use_clipboard_paste: bool,
+    menu_blocked: bool,
+) -> Vec<PasteStrategy> {
+    let mut primary = choose_strategy(bundle_id, use_clipboard_paste);
+    if primary == PasteStrategy::MenuPaste && menu_blocked {
+        primary = PasteStrategy::AppleScriptCmdV;
+    }
+    let mut attempts = vec![primary];
+    attempts.extend_from_slice(fallback_after(primary));
+    attempts
+}
+
 impl fmt::Display for PasteStrategy {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
@@ -286,6 +303,21 @@ mod tests {
         assert_eq!(
             choose_strategy("com.apple.TextEdit", true),
             PasteStrategy::MenuPaste
+        );
+    }
+
+    #[test]
+    fn blocked_menu_goes_straight_to_cmd_v() {
+        let plan = plan_attempts("jp.naver.line.mac", true, true);
+        assert_eq!(plan[0], PasteStrategy::AppleScriptCmdV);
+        assert!(!plan.contains(&PasteStrategy::MenuPaste));
+        let open = plan_attempts("jp.naver.line.mac", true, false);
+        assert_eq!(open[0], PasteStrategy::MenuPaste);
+        assert_eq!(open[1], PasteStrategy::AppleScriptCmdV);
+        // TypeText is never rewritten by the menu block.
+        assert_eq!(
+            plan_attempts("com.apple.TextEdit", false, true)[0],
+            PasteStrategy::TypeText
         );
     }
 
