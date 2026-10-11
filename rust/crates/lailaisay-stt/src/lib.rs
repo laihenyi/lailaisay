@@ -23,6 +23,8 @@ pub mod dummy;
 pub mod gpu_probe;
 #[cfg(feature = "process-whisper")]
 pub mod process_whisper;
+pub mod qwen_sidecar;
+pub(crate) mod sidecar;
 #[cfg(feature = "mic")]
 pub mod record;
 pub mod worker_protocol;

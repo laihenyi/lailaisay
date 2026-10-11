@@ -114,11 +114,38 @@ impl SharedState {
 
     /// Load whisper.cpp (or dummy) once. No-ops when the resolved path is unchanged.
     pub fn ensure_stt(&mut self) {
+        if lailaisay_stt::qwen_sidecar::requested() {
+            self.ensure_qwen_stt();
+            return;
+        }
         let want = resolve_whisper_model(&self.settings);
         if self.stt.is_some() && self.stt_path == want {
             return;
         }
         self.load_stt(want);
+    }
+
+    /// Experimental `TOK_STT_BACKEND=qwen3-mlx`: resident Python MLX worker. A failed
+    /// start falls back to the dummy backend and is not retried until a reload.
+    fn ensure_qwen_stt(&mut self) {
+        if self.stt.is_some() && self.stt_note.starts_with("qwen") {
+            return;
+        }
+        self.stt_load_count += 1;
+        let (backend, note): (Arc<dyn Transcriber>, String) =
+            match lailaisay_stt::qwen_sidecar::QwenSidecarTranscriber::load() {
+                Ok(t) => {
+                    tracing::info!("STT resident — Qwen3-ASR sidecar");
+                    (Arc::new(t), "qwen3-asr sidecar".into())
+                }
+                Err(e) => {
+                    tracing::warn!("qwen3-asr sidecar failed ({e}); dummy STT");
+                    (dummy_backend(), format!("dummy (qwen3-asr sidecar failed: {e})"))
+                }
+            };
+        self.stt = Some(backend);
+        self.stt_path = None;
+        self.stt_note = note;
     }
 
     pub fn force_reload_stt(&mut self) {
