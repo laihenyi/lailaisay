@@ -2547,6 +2547,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 1.0.69",
+ "transcribe-cpp",
  "whisper-rs",
 ]
 
@@ -4726,6 +4727,27 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
+]
+
+[[package]]
+name = "transcribe-cpp"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f06368bb32251b5e93ceb8cae2d6ba9adff6a51693c7ce108449e65522b05c6"
+dependencies = [
+ "log",
+ "thiserror 2.0.20",
+ "transcribe-cpp-sys",
+]
+
+[[package]]
+name = "transcribe-cpp-sys"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fedfadb42719d92e58a2c340ccfb6ef327ac1b846fc1d4716b65384a330513a6"
+dependencies = [
+ "cmake",
+ "serde_json",
 ]
 
 [[package]]

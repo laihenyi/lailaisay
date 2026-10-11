@@ -116,7 +116,8 @@ if [[ -z "$FEATURES" ]]; then
   if [[ "$APP_STORE" -eq 1 ]]; then
     FEATURES="mic,whisper,appstore"
   else
-    FEATURES="mic,whisper"
+    # qwen: Qwen3-ASR GGUF via transcribe.cpp shared libraries (bundled in Contents/Frameworks).
+    FEATURES="mic,whisper,qwen"
   fi
 fi
 
@@ -233,10 +234,6 @@ mkdir -p "$MACOS" "$RES"
 cp "$PLIST_SRC" "$APP/Contents/Info.plist"
 cp "$ROOT/crates/lailaisay-app/assets/fonts/OFL.txt" "$RES/FONT-LICENSE.txt"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
-# Qwen3-ASR sidecar worker: needs an external Python, which the App Store sandbox forbids.
-if [[ "$APP_STORE" -ne 1 ]]; then
-  cp "$ROOT/scripts/qwen3_asr_worker.py" "$RES/qwen3_asr_worker.py"
-fi
 
 ICON_SRC="$ROOT/macos/AppIcon.icns"
 if [[ -f "$ICON_SRC" ]]; then
@@ -295,6 +292,27 @@ else
   echo "Embedded $(basename "$BIN") → $MACOS/lailaisay-app"
   if command -v file >/dev/null 2>&1; then
     file "$MACOS/lailaisay-app" || true
+  fi
+  if [[ ",$FEATURES," == *",qwen,"* && -z "${TOK_APP_BIN:-}" ]]; then
+    # transcribe.cpp is linked as shared libraries (a static copy would collide with
+    # whisper.cpp's ggml). Ship the newest build's dylibs next to the binary.
+    QWEN_LIB=""
+    for d in $(ls -td "$RELEASE_DIR"/build/transcribe-cpp-sys-*/out/lib 2>/dev/null); do
+      if ls "$d"/libtranscribe.*.dylib >/dev/null 2>&1; then QWEN_LIB="$d"; break; fi
+    done
+    if [[ -z "$QWEN_LIB" ]]; then
+      echo "qwen feature is on but no transcribe.cpp dylibs were found under $RELEASE_DIR/build" >&2
+      exit 1
+    fi
+    FW="$APP/Contents/Frameworks"
+    mkdir -p "$FW"
+    cp -a "$QWEN_LIB"/lib*.dylib "$FW"/
+    echo "Embedded transcribe.cpp libraries from $QWEN_LIB → $FW"
+    # Drop the build-tree rpath; the bundle resolves via @executable_path/../Frameworks.
+    otool -l "$MACOS/lailaisay-app" | awk '/LC_RPATH/{f=1} f&&/path /{print $2; f=0}' |
+      grep -v '^@' | while read -r rp; do
+        install_name_tool -delete_rpath "$rp" "$MACOS/lailaisay-app"
+      done
   fi
   if [[ -n "$CARGO_TARGET" ]]; then
     echo "cargo target: $CARGO_TARGET"

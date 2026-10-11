@@ -33,7 +33,6 @@ pub struct SharedState {
     pub stt_note: String,
     /// Why the selected Qwen3-ASR model could not start (Whisper is used instead).
     pub stt_warning: String,
-    qwen_failed: Option<String>,
     stt_load_count: u32,
     pub last_stt: String,
     pub last_final: String,
@@ -53,7 +52,6 @@ impl SharedState {
             stt_path: None,
             stt_note: String::from("not loaded"),
             stt_warning: String::new(),
-            qwen_failed: None,
             stt_load_count: 0,
             last_stt: String::new(),
             last_final: String::new(),
@@ -119,13 +117,6 @@ impl SharedState {
 
     /// Load whisper.cpp (or dummy) once. No-ops when the resolved path is unchanged.
     pub fn ensure_stt(&mut self) {
-        if let Some(repo) = self.wanted_qwen_repo() {
-            if self.ensure_qwen_stt(&repo) {
-                return;
-            }
-        } else {
-            self.stt_warning.clear();
-        }
         let want = resolve_whisper_model(&self.settings);
         if self.stt.is_some() && self.stt_path == want {
             return;
@@ -133,48 +124,7 @@ impl SharedState {
         self.load_stt(want);
     }
 
-    /// Qwen3-ASR repo requested by the selected model (or the developer env override).
-    fn wanted_qwen_repo(&self) -> Option<String> {
-        self.settings
-            .selected_whisper_model
-            .as_deref()
-            .and_then(lailaisay_stt::qwen_sidecar::selection_repo)
-            .map(str::to_owned)
-            .or_else(lailaisay_stt::qwen_sidecar::env_override_repo)
-    }
-
-    /// Load the Qwen3-ASR sidecar for `repo`. On failure the reason is kept in
-    /// `stt_warning` and the caller falls back to Whisper.
-    fn ensure_qwen_stt(&mut self, repo: &str) -> bool {
-        let note = format!("qwen3-asr: {repo}");
-        if self.stt.is_some() && self.stt_note == note {
-            return true;
-        }
-        if self.qwen_failed.as_deref() == Some(repo) {
-            return false;
-        }
-        self.stt_load_count += 1;
-        self.stt = None;
-        self.stt_path = None;
-        match lailaisay_stt::qwen_sidecar::QwenSidecarTranscriber::load(repo) {
-            Ok(t) => {
-                tracing::info!(repo, "STT resident — Qwen3-ASR sidecar");
-                self.stt = Some(Arc::new(t));
-                self.stt_note = note;
-                self.stt_warning.clear();
-                true
-            }
-            Err(e) => {
-                tracing::warn!(repo, "qwen3-asr sidecar failed ({e}); falling back to Whisper");
-                self.stt_warning = format!("Qwen3-ASR 無法啟動，已改用 Whisper：{e}");
-                self.qwen_failed = Some(repo.to_string());
-                false
-            }
-        }
-    }
-
     pub fn force_reload_stt(&mut self) {
-        self.qwen_failed = None;
         self.stt = None;
         self.stt_path = None;
         self.ensure_stt();
@@ -182,6 +132,7 @@ impl SharedState {
 
     fn load_stt(&mut self, want: Option<PathBuf>) {
         self.stt_load_count += 1;
+        self.stt_warning.clear();
         let (backend, note) = match want.as_deref() {
             Some(path) => match open_stt(Some(path)) {
                 Ok(boxed) => {
@@ -192,14 +143,26 @@ impl SharedState {
                     (Arc::from(boxed), format!("resident: {}", path.display()))
                 }
                 Err(e) => {
-                    tracing::warn!(
-                        path = %path.display(),
-                        "could not load whisper model ({e}); dummy STT until a `whisper` build + ggml/gguf"
-                    );
-                    (
-                        dummy_backend(),
-                        format!("dummy (failed to load {}: {e})", path.display()),
-                    )
+                    // A Qwen3-ASR file that cannot start (build without `qwen`, bad
+                    // download) must not silence dictation: use a Whisper model instead.
+                    let fallback = lailaisay_stt::is_qwen_asr_model(path)
+                        .then(crate::models::whisper_fallback_model)
+                        .flatten()
+                        .and_then(|fb| open_stt(Some(&fb)).ok().map(|b| (b, fb)));
+                    if let Some((boxed, fb)) = fallback {
+                        tracing::warn!(path = %path.display(), "Qwen3-ASR failed ({e}); using Whisper {}", fb.display());
+                        self.stt_warning = format!("Qwen3-ASR 無法載入，已改用 Whisper：{e}");
+                        (Arc::from(boxed), format!("resident: {}", fb.display()))
+                    } else {
+                        tracing::warn!(
+                            path = %path.display(),
+                            "could not load model ({e}); dummy STT until a working model is selected"
+                        );
+                        (
+                            dummy_backend(),
+                            format!("dummy (failed to load {}: {e})", path.display()),
+                        )
+                    }
                 }
             },
             None => {

@@ -60,6 +60,34 @@ pub const CATALOG: &[CatalogEntry] = &[
         size_hint: "~1.6 GB",
         min_bytes: 500_000_000,
     },
+    CatalogEntry {
+        id: "qwen3-asr-1.7b",
+        filename: "Qwen3-ASR-1.7B-Q4_K_M.gguf",
+        label: "Qwen3-ASR 1.7B Q4 · 準確、快（推薦）",
+        size_hint: "~1.3 GB",
+        min_bytes: 1_000_000_000,
+    },
+    CatalogEntry {
+        id: "qwen3-asr-1.7b-q8",
+        filename: "Qwen3-ASR-1.7B-Q8_0.gguf",
+        label: "Qwen3-ASR 1.7B Q8",
+        size_hint: "~2.2 GB",
+        min_bytes: 1_500_000_000,
+    },
+    CatalogEntry {
+        id: "qwen3-asr-0.6b",
+        filename: "Qwen3-ASR-0.6B-Q8_0.gguf",
+        label: "Qwen3-ASR 0.6B Q8 · 最快",
+        size_hint: "~850 MB",
+        min_bytes: 600_000_000,
+    },
+    CatalogEntry {
+        id: "qwen3-asr-0.6b-q4",
+        filename: "Qwen3-ASR-0.6B-Q4_K_M.gguf",
+        label: "Qwen3-ASR 0.6B Q4",
+        size_hint: "~590 MB",
+        min_bytes: 400_000_000,
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -110,11 +138,26 @@ pub fn catalog_url(entry: &CatalogEntry) -> String {
             }
         }
     }
+    if let Some(url) = qwen_catalog_url(entry) {
+        return url;
+    }
     let base = std::env::var("TOK_WHISPER_MODEL_BASE_URL")
         .ok()
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| DEFAULT_HF_BASE.into());
     format!("{}/{}", base.trim_end_matches('/'), entry.filename)
+}
+
+/// Qwen3-ASR GGUFs live in handy-computer's per-size repos, not in whisper.cpp's.
+fn qwen_catalog_url(entry: &CatalogEntry) -> Option<String> {
+    if !lailaisay_stt::is_qwen_asr_model(Path::new(entry.filename)) {
+        return None;
+    }
+    let size = if entry.filename.contains("0.6B") { "0.6B" } else { "1.7B" };
+    Some(format!(
+        "https://huggingface.co/handy-computer/Qwen3-ASR-{size}-gguf/resolve/main/{}",
+        entry.filename
+    ))
 }
 
 pub fn catalog_is_downloaded(entry: &CatalogEntry) -> bool {
@@ -232,6 +275,10 @@ pub fn friendly_model_label(model: &FoundModel) -> String {
         "ggml-medium.bin" => "Medium · 較高品質",
         "ggml-large-v3.bin" => "Large v3 · 高品質",
         "ggml-large-v3-turbo.bin" => "Large v3 Turbo · 高品質、較快速",
+        "Qwen3-ASR-1.7B-Q4_K_M.gguf" => "Qwen3-ASR 1.7B Q4 · 準確、快",
+        "Qwen3-ASR-1.7B-Q8_0.gguf" => "Qwen3-ASR 1.7B Q8",
+        "Qwen3-ASR-0.6B-Q8_0.gguf" => "Qwen3-ASR 0.6B Q8 · 最快",
+        "Qwen3-ASR-0.6B-Q4_K_M.gguf" => "Qwen3-ASR 0.6B Q4",
         _ => &name,
     };
     format!("{} ({}){size}", friendly, model.source.tag())
@@ -275,7 +322,15 @@ pub fn resolve_whisper_model(settings: &LailaisaySettings) -> Option<PathBuf> {
             return Some(p);
         }
     }
-    list_usable_models().into_iter().next().map(|m| m.path)
+    whisper_fallback_model()
+}
+
+/// First local model whisper.cpp can load (Qwen3-ASR files are not Whisper weights).
+pub fn whisper_fallback_model() -> Option<PathBuf> {
+    list_usable_models()
+        .into_iter()
+        .map(|m| m.path)
+        .find(|p| !lailaisay_stt::is_qwen_asr_model(p))
 }
 
 pub fn tiny_model_path() -> PathBuf {
@@ -365,6 +420,50 @@ mod tests {
     use std::sync::Mutex;
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn qwen_catalog_entries_use_their_own_repos_and_never_whisper_urls() {
+        let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let mut qwen = 0;
+        for entry in CATALOG {
+            let url = catalog_url(entry);
+            if lailaisay_stt::is_qwen_asr_model(Path::new(entry.filename)) {
+                qwen += 1;
+                assert!(
+                    url.contains("huggingface.co/handy-computer/Qwen3-ASR-")
+                        && url.ends_with(entry.filename),
+                    "{url}"
+                );
+            } else {
+                assert!(url.contains("ggerganov/whisper.cpp"), "{url}");
+            }
+        }
+        assert_eq!(qwen, 4);
+    }
+
+    #[test]
+    fn whisper_fallback_never_returns_a_qwen_file() {
+        let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = std::env::temp_dir().join(format!("lailaisay-fallback-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("Qwen3-ASR-0.6B-Q8_0.gguf"), b"x").unwrap();
+        let prev_dir = std::env::var_os("TOK_MODELS_DIR");
+        let prev_env = std::env::var_os("TOK_WHISPER_MODEL");
+        let prev_mac = std::env::var_os("TOK_MACWHISPER_MODELS_DIR");
+        std::env::set_var("TOK_MODELS_DIR", &dir);
+        std::env::remove_var("TOK_WHISPER_MODEL");
+        std::env::set_var("TOK_MACWHISPER_MODELS_DIR", dir.join("none"));
+        assert_eq!(whisper_fallback_model(), None);
+        std::fs::write(dir.join("ggml-tiny.bin"), b"x").unwrap();
+        assert_eq!(
+            whisper_fallback_model().and_then(|p| p.file_name().map(|n| n.to_owned())),
+            Some("ggml-tiny.bin".into())
+        );
+        restore_env("TOK_MODELS_DIR", prev_dir);
+        restore_env("TOK_WHISPER_MODEL", prev_env);
+        restore_env("TOK_MACWHISPER_MODELS_DIR", prev_mac);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     fn restore_env(key: &str, prev: Option<std::ffi::OsString>) {
         match prev {

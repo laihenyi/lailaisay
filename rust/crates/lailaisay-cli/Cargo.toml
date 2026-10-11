@@ -14,6 +14,8 @@ default = []
 whisper = ["lailaisay-stt/whisper"]
 metal = ["lailaisay-stt/metal"]
 mic = ["lailaisay-stt/mic"]
+# Qwen3-ASR GGUF models via transcribe.cpp (macOS; shared libraries next to the binary).
+qwen = ["lailaisay-stt/qwen"]
 
 [dependencies]
 lailaisay-core.workspace = true

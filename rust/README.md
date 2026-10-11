@@ -39,7 +39,11 @@ cargo run -p lailaisay-app --release --features whisper -- --once \
 - [Windows build, installer and diagnostics](WINDOWS.md)
 - [Release checklist](../RELEASE_CHECKLIST.md)
 
-The model menu lists usable local ggml/gguf files from the application cache, `TOK_WHISPER_MODEL`, and MacWhisper. The catalog downloads multilingual tiny, base, small, medium, large-v3 and large-v3-turbo. Optional AI polish is separate from speech recognition; Ollama is not needed for local Whisper.
+The model menu lists usable local ggml/gguf files from the application cache, `TOK_WHISPER_MODEL`, and MacWhisper. The catalog downloads multilingual tiny, base, small, medium, large-v3 and large-v3-turbo. 
+
+**Qwen3-ASR (macOS, `--features qwen`).** The catalog also downloads Qwen3-ASR 1.7B/0.6B GGUF files (`Qwen3-ASR-*.gguf`, from `handy-computer/Qwen3-ASR-*-gguf`). They run through [transcribe.cpp](https://github.com/handy-computer/transcribe.cpp) (ggml, Metal), selected by file name in `lailaisay_stt::open_auto`; custom words go in as the context prompt. transcribe.cpp is linked as shared libraries because a static copy collides with whisper.cpp's ggml symbols: `package-macos-app.sh` copies them to `Contents/Frameworks`, and `cargo run` finds them through an rpath to the build directory. Not in the App Store variant. If a Qwen model fails to load, the app falls back to a Whisper model and says why in settings. Try it without the app: `cargo run -p lailaisay-cli --features qwen,whisper -- transcribe --model Qwen3-ASR-1.7B-Q4_K_M.gguf --file x.wav`.
+
+Optional AI polish is separate from speech recognition; Ollama is not needed for local Whisper.
 
 ## Existing user data
 

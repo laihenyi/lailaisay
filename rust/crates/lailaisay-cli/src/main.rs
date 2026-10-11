@@ -96,6 +96,8 @@ enum BackendArg {
     Auto,
     Dummy,
     Whisper,
+    /// Qwen3-ASR GGUF (macOS, `--features qwen`).
+    Qwen,
 }
 
 #[tokio::main]
@@ -214,6 +216,7 @@ fn open_stt(
         BackendArg::Auto => Ok(open_auto(model, sidecar)?),
         BackendArg::Dummy => Ok(open_backend(BackendKind::Dummy, model, sidecar)?),
         BackendArg::Whisper => Ok(open_backend(BackendKind::Whisper, model, sidecar)?),
+        BackendArg::Qwen => Ok(open_backend(BackendKind::Qwen, model, sidecar)?),
     }
 }
 

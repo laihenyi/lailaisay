@@ -23,7 +23,6 @@ pub mod dummy;
 pub mod gpu_probe;
 #[cfg(feature = "process-whisper")]
 pub mod process_whisper;
-pub mod qwen_sidecar;
 pub(crate) mod sidecar;
 #[cfg(feature = "mic")]
 pub mod record;
@@ -31,6 +30,21 @@ pub mod worker_protocol;
 
 #[cfg(feature = "whisper")]
 pub mod whisper;
+
+#[cfg(all(feature = "qwen", target_os = "macos"))]
+pub mod qwen;
+
+/// Qwen3-ASR GGUF files (transcribe.cpp), as opposed to whisper.cpp ggml/gguf weights.
+/// Detected by file name (`Qwen3-ASR-*.gguf`), the same names the catalog downloads.
+pub fn is_qwen_asr_model(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| {
+            let n = n.to_ascii_lowercase();
+            n.starts_with("qwen3-asr") && n.ends_with(".gguf")
+        })
+        .unwrap_or(false)
+}
 
 #[derive(Debug, Error)]
 pub enum SttError {
@@ -118,6 +132,8 @@ pub trait Transcriber: Send + Sync {
 pub enum BackendKind {
     Dummy,
     Whisper,
+    /// Qwen3-ASR GGUF via transcribe.cpp (`qwen` feature, macOS).
+    Qwen,
 }
 
 impl BackendKind {
@@ -125,6 +141,7 @@ impl BackendKind {
         match name.to_ascii_lowercase().as_str() {
             "dummy" | "fixture" => Some(Self::Dummy),
             "whisper" | "whisper.cpp" | "whisper-cpp" => Some(Self::Whisper),
+            "qwen" | "qwen3-asr" => Some(Self::Qwen),
             _ => None,
         }
     }
@@ -138,6 +155,12 @@ pub fn open_backend(
 ) -> Result<Box<dyn Transcriber>> {
     match kind {
         BackendKind::Dummy => Ok(Box::new(dummy::DummyTranscriber::new(sidecar_root))),
+        BackendKind::Qwen => {
+            let path = model.ok_or_else(|| {
+                SttError::Whisper("pass --model / path to a Qwen3-ASR .gguf file".into())
+            })?;
+            open_qwen(path)
+        }
         BackendKind::Whisper => {
             #[cfg(feature = "whisper")]
             {
@@ -165,20 +188,41 @@ pub fn open_backend(
     }
 }
 
-/// Auto: whisper if a model path exists, otherwise dummy.
+#[cfg(all(feature = "qwen", target_os = "macos"))]
+fn open_qwen(path: &Path) -> Result<Box<dyn Transcriber>> {
+    Ok(Box::new(qwen::QwenTranscriber::load(path)?))
+}
+
+#[cfg(not(all(feature = "qwen", target_os = "macos")))]
+fn open_qwen(_path: &Path) -> Result<Box<dyn Transcriber>> {
+    Err(SttError::Whisper(
+        "Qwen3-ASR 需要 macOS 並以 `--features qwen` 編譯（此版本不含 Qwen3-ASR）".into(),
+    ))
+}
+
+/// The backend a model file needs: Qwen3-ASR GGUF vs. whisper.cpp.
+pub fn backend_for_model(path: &Path) -> BackendKind {
+    if is_qwen_asr_model(path) {
+        BackendKind::Qwen
+    } else {
+        BackendKind::Whisper
+    }
+}
+
+/// Auto: whisper (or Qwen3-ASR, by file name) if a model path exists, otherwise dummy.
 pub fn open_auto(
     model: Option<&Path>,
     sidecar_root: Option<&Path>,
 ) -> Result<Box<dyn Transcriber>> {
     if let Some(path) = model {
         if path.exists() {
-            return open_backend(BackendKind::Whisper, Some(path), sidecar_root);
+            return open_backend(backend_for_model(path), Some(path), sidecar_root);
         }
     }
     if let Ok(env) = std::env::var("TOK_WHISPER_MODEL") {
         let path = PathBuf::from(env);
         if path.exists() {
-            return open_backend(BackendKind::Whisper, Some(&path), sidecar_root);
+            return open_backend(backend_for_model(&path), Some(&path), sidecar_root);
         }
     }
     open_backend(BackendKind::Dummy, None, sidecar_root)
@@ -220,6 +264,23 @@ pub mod whisper_decode {
 #[cfg(test)]
 mod timestamp_tests {
     use super::whisper_centiseconds_to_secs;
+
+    #[test]
+    fn qwen_models_are_routed_by_file_name() {
+        use std::path::Path;
+        assert!(crate::is_qwen_asr_model(Path::new("/m/Qwen3-ASR-1.7B-Q4_K_M.gguf")));
+        assert!(crate::is_qwen_asr_model(Path::new("qwen3-asr-0.6b-q8_0.GGUF")));
+        assert!(!crate::is_qwen_asr_model(Path::new("/m/ggml-large-v3-turbo.bin")));
+        assert!(!crate::is_qwen_asr_model(Path::new("/m/Qwen3-ASR-1.7B.safetensors")));
+        assert_eq!(
+            crate::backend_for_model(Path::new("Qwen3-ASR-0.6B-Q8_0.gguf")),
+            crate::BackendKind::Qwen
+        );
+        assert_eq!(
+            crate::backend_for_model(Path::new("ggml-tiny.bin")),
+            crate::BackendKind::Whisper
+        );
+    }
 
     #[test]
     fn centiseconds_convert_like_whisper_rs_docs() {

@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Local speech-to-text for lailaisay (whisper.cpp via whisper-rs, plus a fixture backend)"
+# Re-emits the transcribe.cpp runtime directory (DEP_LAILAISAY_STT_RUNTIME_DIR) for the binaries' rpath.
+links = "lailaisay_stt"
+build = "build.rs"
 
 [features]
 default = []
@@ -14,6 +17,9 @@ whisper = ["dep:whisper-rs"]
 metal = ["whisper", "whisper-rs/metal"]
 vulkan = ["whisper", "whisper-rs/vulkan", "gpu-probe"]
 process-whisper = []
+# Qwen3-ASR GGUF via transcribe.cpp (macOS only). Linked as a shared library:
+# a static copy would collide with whisper.cpp's ggml symbols.
+qwen = ["dep:transcribe-cpp"]
 gpu-probe = ["dep:ash"]
 # Microphone capture via cpal (needs ALSA/Pulse on Linux, CoreAudio on macOS).
 mic = ["dep:cpal"]
@@ -32,6 +38,7 @@ whisper-rs = { version = "=0.13.2", optional = true }
 # compiles Metal without a separate `--features metal`.
 [target.'cfg(target_os = "macos")'.dependencies]
 whisper-rs = { version = "=0.13.2", optional = true, features = ["metal"] }
+transcribe-cpp = { version = "=0.3.1", optional = true, default-features = false, features = ["shared", "metal"] }
 
 [[bin]]
 name = "lailaisay-whisper-worker"

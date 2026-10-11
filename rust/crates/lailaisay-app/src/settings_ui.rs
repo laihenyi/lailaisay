@@ -658,9 +658,6 @@ impl SettingsForm {
         ui.label(egui::RichText::new("使用模型").size(14.0).color(FG));
         let selected_text = if self.selected_model.is_empty() {
             "（無 / dummy）".to_string()
-        } else if let Some(repo) = lailaisay_stt::qwen_sidecar::selection_repo(&self.selected_model)
-        {
-            lailaisay_stt::qwen_sidecar::choice_label(repo)
         } else {
             self.local_models
                 .iter()
@@ -694,24 +691,6 @@ impl SettingsForm {
                         .clicked()
                     {
                         self.selected_model = value.into_owned();
-                    }
-                }
-                if qwen_choices_enabled() {
-                    ui.separator();
-                    ui.label(
-                        egui::RichText::new("Qwen3-ASR（MLX，實驗）")
-                            .size(12.0)
-                            .color(MUTED),
-                    );
-                    for (repo, label) in lailaisay_stt::qwen_sidecar::CHOICES {
-                        let value = lailaisay_stt::qwen_sidecar::selection_value(repo);
-                        if ui
-                            .selectable_label(self.selected_model == value, egui::RichText::new(*label))
-                            .on_hover_text(*repo)
-                            .clicked()
-                        {
-                            self.selected_model = value;
-                        }
                     }
                 }
             },
@@ -2433,11 +2412,6 @@ pub fn tilde_home_path(path: &Path) -> String {
     s
 }
 
-/// Qwen3-ASR needs the external Python sidecar: macOS, not the sandboxed App Store build.
-pub fn qwen_choices_enabled() -> bool {
-    cfg!(all(target_os = "macos", not(feature = "appstore")))
-}
-
 pub fn model_inventory_note(local_ggml: usize) -> String {
     format!("{local_ggml} 個本機 ggml 模型")
 }
@@ -2447,20 +2421,6 @@ pub fn resident_load_note(
     local_models: &[crate::models::FoundModel],
     selected: &str,
 ) -> Option<String> {
-    if let Some(repo) = stt_note
-        .strip_prefix("qwen3-asr: ")
-        .or_else(|| lailaisay_stt::qwen_sidecar::selection_repo(selected))
-    {
-        let label = if stt_note.starts_with("qwen3-asr: ") {
-            "目前載入"
-        } else {
-            "目前選擇"
-        };
-        return Some(format!(
-            "{label}：{}",
-            lailaisay_stt::qwen_sidecar::choice_label(repo.trim())
-        ));
-    }
     if stt_note.starts_with("dummy") || (stt_note.is_empty() && selected.is_empty()) {
         return if stt_note.starts_with("dummy") {
             Some("目前載入：dummy（無模型）".into())
@@ -3736,22 +3696,6 @@ mod tests {
             );
             Popup::close_id(&ctx, popup_id);
         }
-    }
-
-    #[test]
-    fn qwen_selection_is_described_not_treated_as_a_path() {
-        let sel = lailaisay_stt::qwen_sidecar::selection_value(
-            lailaisay_stt::qwen_sidecar::DEFAULT_MODEL,
-        );
-        let loaded = resident_load_note(
-            &format!("qwen3-asr: {}", lailaisay_stt::qwen_sidecar::DEFAULT_MODEL),
-            &[],
-            &sel,
-        )
-        .unwrap();
-        assert!(loaded.starts_with("目前載入：Qwen3-ASR 0.6B"), "{loaded}");
-        let chosen = resident_load_note("device: Qwen3-ASR · MLX", &[], &sel).unwrap();
-        assert!(chosen.starts_with("目前選擇：Qwen3-ASR"), "{chosen}");
     }
 
     fn measure_isolated_pane_height(pane: SettingsSection, width: f32) -> f32 {
