@@ -114,7 +114,7 @@ if [[ "$DEVELOPER_ID" -eq 1 && "$APP_STORE" -eq 1 ]]; then
 fi
 if [[ -z "$FEATURES" ]]; then
   if [[ "$APP_STORE" -eq 1 ]]; then
-    FEATURES="mic,whisper,appstore"
+    FEATURES="mic,whisper,appstore,qwen"
   else
     # qwen: Qwen3-ASR GGUF via transcribe.cpp shared libraries (bundled in Contents/Frameworks).
     FEATURES="mic,whisper,qwen"

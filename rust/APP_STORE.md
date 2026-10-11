@@ -16,6 +16,8 @@ Mac App Store 審核強制要求 App Sandbox。Developer ID 版（`macos/lailais
 | 權限頁 | 輔助使用／麥克風／輸入監控／自動化 | 只顯示麥克風 |
 | entitlements | `macos/lailaisay.entitlements` | `macos/lailaisay-appstore.entitlements`（sandbox + audio-input + network.client + files.user-selected.read-only） |
 
+**Qwen3-ASR（2026-10-11）**：App Store 版也編入 `qwen`（`package-macos-app.sh --app-store` 預設 `mic,whisper,appstore,qwen`），設定的模型目錄與下拉選單列出 Qwen3-ASR GGUF，內建模型為零，使用者自行下載（來源 Hugging Face，與 Whisper 同一個 `network.client`）。transcribe.cpp 以動態函式庫放在 `Contents/Frameworks`，與 App 同憑證簽署。已驗證：以開發憑證重簽的沙盒副本（去掉需 profile 的 `application-identifier` / `team-identifier`，沙盒保留）可從 Frameworks 載入並以 Metal 載入容器內的 `Qwen3-ASR-1.7B-Q4_K_M.gguf`。**尚未驗證**：商店簽署的 `.pkg` 通過 App Store Connect 驗證（巢狀 dylib 簽署）、沙盒內從選單下載 GGUF 並辨識、審核結果。送審前先用 `fastlane mac beta`（TestFlight）實測。
+
 已驗證（2026-09-21，本機 Apple Silicon）：`--app-store` 打包成功、`codesign` 含 sandbox entitlement、`pkgutil --check-signature` 通過；以 `open dist/lailaisay.app` 啟動後程序存活、`hex_settings.json` 寫入容器 `Data/Documents`、stderr 出現「Carbon hotkey registered (⌘⇧SPACE)」。預設字典改為編譯進二進位（原本從 repo 路徑讀取，沙盒下會 EPERM）。
 
 已實機驗證（2026-09-21）：Carbon 熱鍵 ⌘⇧Space 按住說話可用。（2026-09-24）啟動時出現麥克風授權詢問。尚待驗證：模型下載是否落在容器內、`rfd` 開檔面板匯入字典。注意：從終端機直接執行沙盒版二進位不會重設 `HOME`，會因存取 `~/Documents` 失敗而退出；請用 `open dist/lailaisay.app` 測試。`--once` 需讀 repo 內的 fixture，沙盒版不適用。
