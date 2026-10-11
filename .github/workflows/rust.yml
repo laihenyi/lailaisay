@@ -131,9 +131,9 @@ jobs:
       - name: Test and check the Mac App Store (sandbox) variant
         run: |
           cargo test --locked -p lailaisay-app -p lailaisay-input -p lailaisay-paste --features lailaisay-app/appstore --lib
-          cargo check --locked -p lailaisay-app --features mic,whisper,appstore
-      - name: Build release app with microphone and Whisper
-        run: cargo build --locked --release -p lailaisay-app --features mic,whisper
+          cargo check --locked -p lailaisay-app --features mic,whisper,appstore,qwen
+      - name: Build release app with microphone, Whisper and Qwen3-ASR
+        run: cargo build --locked --release -p lailaisay-app --features mic,whisper,qwen
       - name: Package and verify real macOS app
         run: |
           ./scripts/package-macos-app.sh --skip-build --zip
@@ -141,6 +141,7 @@ jobs:
           codesign --verify --deep --strict --verbose=2 dist/lailaisay.app
           test -s dist/lailaisay.app/Contents/Resources/AppIcon.icns
           test -s dist/lailaisay.app/Contents/Resources/FONT-LICENSE.txt
+          ls dist/lailaisay.app/Contents/Frameworks/libtranscribe.*.dylib
       - name: Run packaged app without requesting permissions
         env:
           TOK_CONFIG: ${{ runner.temp }}/lailaisay-ci-settings.json

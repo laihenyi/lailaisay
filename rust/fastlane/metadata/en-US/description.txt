@@ -4,7 +4,7 @@ Features
 • Fully offline speech recognition: whisper.cpp with Metal acceleration on Apple Silicon. Audio never leaves your computer.
 • Built for Traditional Chinese: Taiwan-style characters, punctuation, number and list shaping, filler-word removal. English and mixed-language input work too.
 • Custom dictionary and phonetic corrections for names, products and jargon.
-• Choose your model, from tiny to large-v3-turbo.
+• Choose your model: Whisper (tiny to large-v3-turbo) or Qwen3-ASR (1.7B / 0.6B). All models run on your Mac.
 • Configurable hotkey with hold-to-talk and double-tap lock.
 
 How it works
@@ -14,4 +14,4 @@ How it works
 4. Press ⌘V in any text field
 
 Privacy
-Recognition runs entirely on your Mac. No recording and no text is ever sent to any AI service; the only network connection this app makes is downloading speech model files from Hugging Face.
+Recognition runs entirely on your Mac. No recording and no text is ever sent to any AI service; the only network connection this app makes is downloading speech model files (Whisper or Qwen3-ASR) from Hugging Face.

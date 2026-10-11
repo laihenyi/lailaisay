@@ -14,8 +14,8 @@ lailaisay has no accounts, no servers, and no analytics or tracking. The develop
 
 - 只有在你按住快捷鍵時才會錄音，放開即停止。
   Audio is recorded only while you hold the hotkey and stops when you release it.
-- 語音辨識由內建的 whisper.cpp 在本機完成。錄音不會離開你的電腦，辨識後即丟棄，不會存檔。
-  Speech recognition runs locally with the bundled whisper.cpp. Audio never leaves your computer; it is discarded after recognition and is not saved.
+- 語音辨識由內建的 whisper.cpp（或使用者選擇的 Qwen3-ASR 模型，經 transcribe.cpp）在本機完成。錄音不會離開你的電腦，辨識後即丟棄，不會存檔。
+  Speech recognition runs locally with the bundled whisper.cpp (or the Qwen3-ASR model you choose, via transcribe.cpp). Audio never leaves your computer; it is discarded after recognition and is not saved.
 - 辨識結果只會寫入系統剪貼簿或貼入你正在使用的 App。
   The recognized text is only written to the system clipboard or pasted into the app you are using.
 
@@ -31,8 +31,8 @@ Settings, custom dictionaries, and correction history are stored only in your us
 
 lailaisay（直接下載版）只在下列情況使用網路 / the direct-download version uses the network only in these cases:
 
-- **下載語音模型 / Model downloads**：首次使用時，從 Hugging Face（`huggingface.co`）下載 Whisper 模型檔。此連線只傳送一般的下載請求，不含你的個人資料。
-  On first use, Whisper model files are downloaded from Hugging Face (`huggingface.co`). This request contains no personal data.
+- **下載語音模型 / Model downloads**：首次使用時，從 Hugging Face（`huggingface.co`）下載 Whisper 或 Qwen3-ASR 模型檔。此連線只傳送一般的下載請求，不含你的個人資料。
+  On first use, Whisper or Qwen3-ASR model files are downloaded from Hugging Face (`huggingface.co`). This request contains no personal data.
 - **可選的 AI 潤稿 / Optional AI polish（僅直接下載版 / direct-download version only）**：此功能預設關閉。若你自行啟用並提供 API 金鑰，辨識出的**文字**（不含錄音）會傳送給你選擇的服務商處理：
   This feature is off by default. If you enable it and supply your own API key, the recognized **text** (never the audio) is sent to the provider you choose:
   - Groq（`api.groq.com`）— 適用 [Groq 隱私權政策](https://groq.com/privacy-policy/) / subject to Groq's privacy policy
