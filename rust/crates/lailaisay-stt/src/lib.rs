@@ -35,6 +35,12 @@ pub mod whisper;
 #[cfg(all(feature = "qwen", target_os = "macos"))]
 pub mod qwen;
 
+/// Whether this build can run Qwen3-ASR (macOS with the `qwen` feature). Menus hide the
+/// models otherwise, so Windows and non-`qwen` builds never offer a model they cannot load.
+pub const fn qwen_supported() -> bool {
+    cfg!(all(feature = "qwen", target_os = "macos"))
+}
+
 /// Qwen3-ASR GGUF files (transcribe.cpp), as opposed to whisper.cpp ggml/gguf weights.
 /// Detected by file name (`Qwen3-ASR-*.gguf`), the same names the catalog downloads.
 pub fn is_qwen_asr_model(path: &Path) -> bool {

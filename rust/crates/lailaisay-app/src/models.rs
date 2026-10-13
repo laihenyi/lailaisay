@@ -113,6 +113,13 @@ pub struct FoundModel {
     pub source: ModelSource,
 }
 
+/// Catalog entries this build can actually run (no Qwen3-ASR without `qwen`/macOS).
+pub fn visible_catalog() -> impl Iterator<Item = &'static CatalogEntry> {
+    CATALOG.iter().filter(|e| {
+        lailaisay_stt::qwen_supported() || !lailaisay_stt::is_qwen_asr_model(Path::new(e.filename))
+    })
+}
+
 pub fn catalog_by_id(id: &str) -> Option<&'static CatalogEntry> {
     CATALOG.iter().find(|e| e.id == id)
 }
@@ -217,6 +224,9 @@ pub fn macwhisper_models_dir() -> PathBuf {
 }
 
 fn push_unique(out: &mut Vec<FoundModel>, path: PathBuf, source: ModelSource) {
+    if !lailaisay_stt::qwen_supported() && lailaisay_stt::is_qwen_asr_model(&path) {
+        return;
+    }
     if out.iter().any(|e| e.path == path) {
         return;
     }
@@ -439,6 +449,16 @@ mod tests {
             }
         }
         assert_eq!(qwen, 4);
+    }
+
+    #[test]
+    fn menus_hide_qwen_when_the_build_cannot_run_it() {
+        let shown = visible_catalog()
+            .filter(|e| lailaisay_stt::is_qwen_asr_model(Path::new(e.filename)))
+            .count();
+        assert_eq!(shown, if lailaisay_stt::qwen_supported() { 4 } else { 0 });
+        // Whisper entries are always offered.
+        assert!(visible_catalog().any(|e| e.id == "large-v3-turbo"));
     }
 
     #[test]

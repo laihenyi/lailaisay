@@ -17,7 +17,7 @@ use lailaisay_input::GrantStatus;
 
 use crate::models::{
     catalog_by_id, catalog_dest, catalog_is_downloaded, friendly_model_label, list_usable_models,
-    resolve_whisper_model, CatalogEntry, FoundModel, CATALOG,
+    resolve_whisper_model, CatalogEntry, FoundModel,
 };
 use crate::theme::{
     self, BORDER, DANGER, FG, GLASS_EDGE, GLASS_FILL, GLASS_FILL_DEEP, GLASS_HIGHLIGHT,
@@ -713,7 +713,7 @@ impl SettingsForm {
             .map(catalog_row_label)
             .unwrap_or_else(|| self.selected_catalog_id.clone());
         show_pane_combo(ui, "catalog_model", catalog_text, 300.0, |ui| {
-            for entry in CATALOG {
+            for entry in crate::models::visible_catalog() {
                 if ui
                     .selectable_label(
                         self.selected_catalog_id == entry.id,
