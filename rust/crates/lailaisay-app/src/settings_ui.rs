@@ -15,6 +15,9 @@ use lailaisay_core::{
 };
 use lailaisay_input::GrantStatus;
 
+mod onboarding_ui;
+pub use onboarding_ui::{OnboardingAction, OnboardingView};
+
 use crate::models::{
     catalog_by_id, catalog_dest, catalog_is_downloaded, friendly_model_label, list_usable_models,
     resolve_whisper_model, CatalogEntry, FoundModel,
