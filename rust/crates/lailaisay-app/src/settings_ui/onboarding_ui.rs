@@ -10,6 +10,8 @@ pub struct OnboardingView<'a> {
     pub platform: Platform,
     pub probe: Probe,
     pub stt_warning: &'a str,
+    /// Resident-STT note; a failed model load is shown on the model step.
+    pub stt_note: &'a str,
     /// Only text recorded after the trial step began.
     pub last_final: &'a str,
     pub status: &'a str,
@@ -122,7 +124,15 @@ impl SettingsForm {
         if !view.stt_warning.is_empty() {
             danger_note(ui, view.stt_warning);
         }
-        if !self.downloading && !self.selected_model.is_empty() && !view.probe.model_ready {
+        let load_error = onboarding::model_load_error(view.stt_note);
+        if let Some(err) = load_error {
+            danger_note(ui, err);
+        }
+        if load_error.is_none()
+            && !self.downloading
+            && !self.selected_model.is_empty()
+            && !view.probe.model_ready
+        {
             note(ui, "模型載入中，通常需要數秒到十幾秒…");
             ui.ctx().request_repaint_after(Duration::from_millis(500));
         }
@@ -227,6 +237,7 @@ mod tests {
             platform: Platform::MacDeveloperId,
             probe,
             stt_warning: "",
+            stt_note: "",
             last_final: "",
             status: "idle",
             hotkey_label: "⌘⇧Space",

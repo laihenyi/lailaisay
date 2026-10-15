@@ -200,6 +200,7 @@ struct LailaisayHost {
     trial_baseline: Option<u64>,
     probe_cache: Option<(Instant, onboarding::Probe)>,
     reminder: bool,
+    onboarding_dismissed: bool,
     #[cfg(all(target_os = "macos", not(feature = "appstore")))]
     tap_retry_at: Option<Instant>,
 }
@@ -266,6 +267,7 @@ impl LailaisayHost {
             trial_baseline: None,
             probe_cache: None,
             reminder: false,
+            onboarding_dismissed: false,
             #[cfg(all(target_os = "macos", not(feature = "appstore")))]
             tap_retry_at: None,
         };
@@ -634,11 +636,11 @@ impl LailaisayHost {
     fn refresh_onboarding(&mut self) {
         let probe = self.onboarding_probe();
         let needed = onboarding::needs_wizard(Platform::current(), &probe, self.trial_pending());
-        self.onboarding_active = needed;
+        self.onboarding_active = onboarding::wizard_should_open(needed, self.onboarding_dismissed);
         self.onboarding_done_screen = false;
         self.trial_baseline = None;
         self.reminder = false;
-        if needed {
+        if self.onboarding_active {
             self.form.selected_catalog_id = onboarding::recommended_model_id().to_string();
         }
     }
@@ -735,6 +737,9 @@ impl LailaisayHost {
             OnboardingAction::UseModel(path) => {
                 self.form.selected_model = path;
                 self.save_settings();
+                // save_settings reloads only when the path changed; retry the
+                // same (possibly broken) file explicitly.
+                let _ = self.work_tx.send(Work::ReloadModel);
                 self.probe_cache = None;
             }
             OnboardingAction::Relaunch => {
@@ -747,6 +752,9 @@ impl LailaisayHost {
                 }
             }
             OnboardingAction::Later | OnboardingAction::Finish => {
+                if action == OnboardingAction::Later {
+                    self.onboarding_dismissed = true;
+                }
                 self.onboarding_active = false;
                 self.onboarding_done_screen = false;
                 self.probe_cache = None;
@@ -1305,9 +1313,10 @@ impl LailaisayHost {
         if self.onboarding_active {
             let step = self.onboarding_step();
             let probe = self.onboarding_probe();
-            let (stt_warning, status, last_final, count) = match self.shared.lock() {
+            let (stt_warning, stt_note, status, last_final, count) = match self.shared.lock() {
                 Ok(g) => (
                     g.stt_warning.clone(),
+                    g.stt_note.clone(),
                     g.status.clone(),
                     g.last_final.clone(),
                     g.utterance_count,
@@ -1324,6 +1333,7 @@ impl LailaisayHost {
                 platform: Platform::current(),
                 probe,
                 stt_warning: &stt_warning,
+                stt_note: &stt_note,
                 last_final: &shown_final,
                 status: &status,
                 hotkey_label: &hotkey_label,
