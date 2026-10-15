@@ -37,6 +37,8 @@ pub struct SharedState {
     pub last_stt: String,
     pub last_final: String,
     pub last_llm_note: Option<String>,
+    /// Utterances finished this run (onboarding's trial step watches it).
+    pub utterance_count: u64,
     /// Captured at hotkey-down so paste can restore focus after a long LLM.
     pub paste_target: Option<lailaisay_paste::PasteTarget>,
 }
@@ -56,6 +58,7 @@ impl SharedState {
             last_stt: String::new(),
             last_final: String::new(),
             last_llm_note: None,
+            utterance_count: 0,
             paste_target: None,
         }
     }
@@ -65,6 +68,12 @@ impl SharedState {
     /// "download a model" rather than "no speech".
     pub fn stt_is_placeholder(&self) -> bool {
         self.stt_note.starts_with("dummy")
+    }
+
+    /// A real (non-dummy) decoder is resident. Onboarding's model step is done
+    /// only when this is true, not merely when a model file exists.
+    pub fn model_ready(&self) -> bool {
+        self.stt.is_some() && !self.stt_is_placeholder()
     }
 
     /// Drop a stale "no model" status once a real model is resident.
@@ -102,6 +111,7 @@ impl SharedState {
         final_text: impl Into<String>,
         note: Option<String>,
     ) {
+        self.utterance_count += 1;
         self.last_stt = raw.into();
         self.last_final = final_text.into();
         self.last_llm_note = note;
@@ -456,5 +466,19 @@ mod tests {
             st.last_stt, st.last_final,
             "生稿 and 定稿 must stay distinct for side-by-side"
         );
+    }
+
+    #[test]
+    fn utterance_count_ticks_and_dummy_model_is_not_ready() {
+        let mut st = SharedState::from_context(empty_ctx());
+        assert_eq!(st.utterance_count, 0);
+        assert!(!st.model_ready(), "nothing loaded yet");
+        st.set_last_utterance("a", "b", None);
+        st.set_last_utterance("", "", None);
+        assert_eq!(st.utterance_count, 2);
+
+        st.ensure_stt(); // no model file → dummy placeholder
+        assert!(st.stt_is_placeholder());
+        assert!(!st.model_ready(), "dummy must not satisfy onboarding");
     }
 }
