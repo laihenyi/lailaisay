@@ -134,6 +134,18 @@ pub fn recommended_model_id() -> &'static str {
     }
 }
 
+/// The resident-STT note when a model file failed to load (`shared::load_stt`).
+/// A plain "no model file" placeholder is not an error.
+pub fn model_load_error(stt_note: &str) -> Option<&str> {
+    stt_note.starts_with("dummy (failed").then_some(stt_note)
+}
+
+/// 稍後再說 hides the wizard for the rest of the run, so tray 開啟設定 still
+/// reaches the normal panes (hotkey, microphone, models) when the user needs them.
+pub fn wizard_should_open(needed: bool, dismissed: bool) -> bool {
+    needed && !dismissed
+}
+
 /// The trial passes on a new utterance whose final text is not blank.
 pub fn trial_passed(baseline: u64, count: u64, last_final: &str) -> bool {
     count > baseline && !last_final.trim().is_empty()
@@ -245,5 +257,20 @@ mod tests {
         } else {
             assert_eq!(id, "large-v3-turbo");
         }
+    }
+
+    #[test]
+    fn load_failure_is_surfaced_but_a_plain_missing_model_is_not() {
+        let failed = "dummy (failed to load /m/x.bin: bad magic)";
+        assert_eq!(model_load_error(failed), Some(failed));
+        assert_eq!(model_load_error("dummy (no model file)"), None);
+        assert_eq!(model_load_error("resident: /m/x.bin"), None);
+    }
+
+    #[test]
+    fn dismissing_the_wizard_keeps_it_closed_until_relaunch() {
+        assert!(wizard_should_open(true, false));
+        assert!(!wizard_should_open(true, true), "稍後再說 must reach normal settings");
+        assert!(!wizard_should_open(false, false));
     }
 }
