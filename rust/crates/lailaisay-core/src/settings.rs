@@ -147,6 +147,10 @@ pub struct LailaisaySettings {
     /// First-run gate. Missing from older `hex_settings.json` files (serde
     /// `false`); [`Self::for_launch`] treats an existing file as complete.
     pub has_completed_onboarding: bool,
+    /// The first-run wizard has not passed its 試用 step yet. Missing from
+    /// older files (serde `false`), so existing users are never sent through
+    /// the wizard. Set when the settings file is first created.
+    pub onboarding_pending: bool,
     pub prefer_traditional_chinese: bool,
     #[serde(deserialize_with = "deserialize_enhancement_mode")]
     pub ai_enhancement_mode: AiEnhancementMode,
@@ -209,6 +213,7 @@ impl Default for LailaisaySettings {
             disable_auto_capitalization: false,
             enable_screen_capture: false,
             has_completed_onboarding: false,
+            onboarding_pending: false,
             prefer_traditional_chinese: true,
             ai_enhancement_mode: AiEnhancementMode::Smart,
             ai_polish_style: None,
@@ -305,6 +310,18 @@ impl LailaisaySettings {
         if path.exists() {
             return Ok(());
         }
+        // Brand-new install: the wizard still owes the 試用 step.
+        self.onboarding_pending = true;
+        self.save_path(path)
+    }
+
+    /// The 試用 step passed. Clears `onboardingPending` and persists once.
+    pub fn finish_onboarding(&mut self, path: &Path) -> Result<(), LailaisayError> {
+        if !self.onboarding_pending {
+            return Ok(());
+        }
+        self.onboarding_pending = false;
+        self.has_completed_onboarding = true;
         self.save_path(path)
     }
 
@@ -557,6 +574,57 @@ mod tests {
         );
         assert!(existing.show_settings_on_launch(true));
 
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn onboarding_tmp(name: &str) -> (std::path::PathBuf, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!(
+            "lailaisay-core-onboarding-{name}-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("hex_settings.json");
+        (dir, path)
+    }
+
+    #[test]
+    fn first_run_marks_trial_pending_and_survives_restart() {
+        let (dir, path) = onboarding_tmp("pending");
+        let mut s = LailaisaySettings::default();
+        s.complete_onboarding(&path).unwrap();
+        assert!(s.onboarding_pending, "fresh install owes the trial step");
+
+        // App quit mid-wizard, then relaunched: the file still says pending.
+        let mut relaunched = LailaisaySettings::for_launch(&path);
+        assert!(relaunched.onboarding_pending);
+        relaunched.complete_onboarding(&path).unwrap();
+        assert!(relaunched.onboarding_pending, "must not clear it");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn legacy_settings_file_without_the_key_is_not_pending() {
+        let (dir, path) = onboarding_tmp("legacy");
+        std::fs::write(&path, r#"{"minimizeToMenuBarOnLaunch":true}"#).unwrap();
+        let loaded = LailaisaySettings::for_launch(&path);
+        assert!(!loaded.onboarding_pending, "existing users skip the trial");
+        assert!(loaded.has_completed_onboarding);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn finish_onboarding_clears_pending_once() {
+        let (dir, path) = onboarding_tmp("finish");
+        let mut s = LailaisaySettings::default();
+        s.complete_onboarding(&path).unwrap();
+        s.finish_onboarding(&path).unwrap();
+        assert!(!s.onboarding_pending);
+        assert!(!LailaisaySettings::load_path(&path).unwrap().onboarding_pending);
+
+        let before = std::fs::read(&path).unwrap();
+        s.finish_onboarding(&path).unwrap();
+        assert_eq!(before, std::fs::read(&path).unwrap(), "second call is a no-op");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

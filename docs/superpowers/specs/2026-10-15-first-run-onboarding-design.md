@@ -15,13 +15,13 @@
 ## 決定
 - 形式：設定視窗內的全視窗多步驟精靈（方案 A）。不開第二個視窗，不新增依賴。
 - 強制程度：半強制。未就緒時每次啟動都顯示，每步可「稍後再說」（僅本次執行隱藏）。
-- 不新增設定欄位；`hasCompletedOnboarding` 改為「試用成功」時才寫入，作為「已完成引導」的持久標記。舊 camelCase 設定檔相容；已有設定檔者此旗標本來就是 true，不會被強迫重跑試用。
+- 新增一個設定欄位 `onboardingPending`（缺鍵＝false）。全新安裝建檔時設 true，試用成功時清除。`hasCompletedOnboarding` 語意不變（舊檔相容）。既有使用者因缺鍵不會被強迫試用。
 
 ## 元件
 1. `onboarding.rs`（`lailaisay-app`）
    - `Readiness`：輸入平台／版本（Developer ID、App Store、Windows）、模型載入結果、各權限 `GrantStatus`；輸出缺少的步驟清單（純函式，可單元測試）。
    - 模型就緒＝實際載入成功；dummy 或載入失敗視為未就緒。
-   - 必要權限：Developer ID 版＝麥克風＋輔助使用＋輸入監控；App Store 版與 Windows＝麥克風。
+   - 必要權限：Developer ID 版＝麥克風＋輔助使用＋輸入監控；App Store 版＝麥克風。Windows 與其他平台沒有權限探測，必要權限為空，麥克風問題在試用步驟暴露。
 2. 精靈畫面（`settings_ui.rs` 新模式，未就緒時取代窗格區）
    - 步驟：歡迎 → 語音模型 → 系統權限 → 試用 → 完成；已就緒的步驟自動略過。
    - 模型：推薦卡片（Mac 預設 Qwen3-ASR 1.7B Q4 約 1.3 GB；Windows 預設 large-v3-turbo 約 1.6 GB；備選 Whisper small 約 466 MB）；下載顯示進度，載入成功才算完成；離線時可改選本機已有模型。重用 `start_catalog_download` 與 `poll_download`。
