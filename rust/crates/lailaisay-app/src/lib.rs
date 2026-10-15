@@ -9,6 +9,7 @@ pub mod dock_icon;
 pub mod host;
 pub mod mic_start;
 pub mod models;
+pub mod onboarding;
 pub mod pipeline;
 pub mod session;
 pub mod settings_ui;
