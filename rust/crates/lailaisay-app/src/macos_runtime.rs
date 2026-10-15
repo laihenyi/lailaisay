@@ -144,6 +144,27 @@ unsafe fn nsimage_from_embedded_icns() -> Option<*mut objc::runtime::Object> {
     }
 }
 
+/// `<X>.app` that contains `exe`, if any.
+fn bundle_of(exe: &std::path::Path) -> Option<std::path::PathBuf> {
+    exe.ancestors()
+        .find(|p| p.extension().is_some_and(|e| e == "app"))
+        .map(|p| p.to_path_buf())
+}
+
+/// Start a second instance (`open -n` inside a bundle, the plain binary under
+/// `cargo run`). The caller quits the current process afterwards.
+pub fn relaunch_app() -> std::io::Result<()> {
+    let exe = std::env::current_exe()?;
+    match bundle_of(&exe) {
+        Some(app) => std::process::Command::new("open")
+            .arg("-n")
+            .arg(app)
+            .spawn()
+            .map(|_| ()),
+        None => std::process::Command::new(exe).spawn().map(|_| ()),
+    }
+}
+
 /// Accessory applications can leave their settings above another application's
 /// windows even at NSNormalWindowLevel. Yield once on app deactivation rather
 /// than repeatedly reordering on repaint. Use application activity (not key
@@ -223,5 +244,25 @@ mod window_order_tests {
             settings_deactivate_action(true, should_yield_settings(Some(true), false)),
             SettingsDeactivateAction::OrderBack
         );
+    }
+}
+
+#[cfg(test)]
+mod relaunch_tests {
+    use super::bundle_of;
+    use std::path::Path;
+
+    #[test]
+    fn bundle_is_found_from_the_inner_executable() {
+        let exe = Path::new("/Applications/lailaisay.app/Contents/MacOS/lailaisay-app");
+        assert_eq!(
+            bundle_of(exe).as_deref(),
+            Some(Path::new("/Applications/lailaisay.app"))
+        );
+    }
+
+    #[test]
+    fn cargo_run_binary_has_no_bundle() {
+        assert!(bundle_of(Path::new("/repo/rust/target/release/lailaisay-app")).is_none());
     }
 }

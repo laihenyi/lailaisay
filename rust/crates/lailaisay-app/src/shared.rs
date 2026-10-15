@@ -477,8 +477,11 @@ mod tests {
         st.set_last_utterance("", "", None);
         assert_eq!(st.utterance_count, 2);
 
-        st.ensure_stt(); // no model file → dummy placeholder
-        assert!(st.stt_is_placeholder());
+        // A resident decoder that is only the dummy placeholder is not ready.
+        st.stt = Some(Arc::new(lailaisay_stt::dummy::DummyTranscriber::new(None)));
+        st.stt_note = "dummy (no model file)".into();
         assert!(!st.model_ready(), "dummy must not satisfy onboarding");
+        st.stt_note = "resident: /tmp/ggml-small.bin".into();
+        assert!(st.model_ready());
     }
 }

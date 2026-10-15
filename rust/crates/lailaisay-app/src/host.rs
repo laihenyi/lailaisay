@@ -21,10 +21,11 @@ use crate::pipeline::load_app_context;
 use crate::session::{Session, SessionAction};
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use crate::settings_ui::tray_glyph_from_status;
+use crate::onboarding::{self, Platform, Step};
 use crate::settings_ui::{
     fallback_json_path, load_imported_dictionary, pick_json_file, reload_dictionary_from_disk,
     reveal_dictionary_in_file_manager, DictionaryReload, FormAction, RevealOutcome, SettingsForm,
-    SettingsView,
+    SettingsView, OnboardingAction, OnboardingView,
 };
 use crate::shared::{set_shared_status, spawn_worker, SharedState, Work};
 
@@ -85,7 +86,7 @@ pub fn run() -> Result<()> {
     run_with(runtime_opts_from_settings(&settings, true, false))
 }
 
-pub fn run_with(opts: RuntimeOpts) -> Result<()> {
+pub fn run_with(mut opts: RuntimeOpts) -> Result<()> {
     #[cfg(target_os = "macos")]
     {
         eprintln!(
@@ -122,6 +123,10 @@ pub fn run_with(opts: RuntimeOpts) -> Result<()> {
         let mut g = shared.lock().map_err(|e| anyhow!("shared lock: {e}"))?;
         g.ensure_stt();
         eprintln!("[lailaisay-app] STT: {}", g.stt_note);
+        let probe = onboarding::Probe::read(g.model_ready());
+        if onboarding::needs_wizard(Platform::current(), &probe, g.settings.onboarding_pending) {
+            opts.show_settings = true;
+        }
     }
 
     let (work_tx, work_rx) = mpsc::channel::<Work>();
@@ -189,6 +194,14 @@ struct LailaisayHost {
     quit_id: Option<MenuId>,
     pending_is_edit: bool,
     edit_selection: Option<String>,
+    onboarding_active: bool,
+    onboarding_welcome_seen: bool,
+    onboarding_done_screen: bool,
+    trial_baseline: Option<u64>,
+    probe_cache: Option<(Instant, onboarding::Probe)>,
+    reminder: bool,
+    #[cfg(all(target_os = "macos", not(feature = "appstore")))]
+    tap_retry_at: Option<Instant>,
 }
 
 impl LailaisayHost {
@@ -212,7 +225,7 @@ impl LailaisayHost {
         if let Ok(g) = shared.lock() {
             form.load_dictionary(&g.dictionary);
         }
-        Self {
+        let mut host = Self {
             settings_visible: opts.show_settings,
             should_quit: false,
             did_init: false,
@@ -247,7 +260,17 @@ impl LailaisayHost {
             quit_id: None,
             pending_is_edit: false,
             edit_selection: None,
-        }
+            onboarding_active: false,
+            onboarding_welcome_seen: false,
+            onboarding_done_screen: false,
+            trial_baseline: None,
+            probe_cache: None,
+            reminder: false,
+            #[cfg(all(target_os = "macos", not(feature = "appstore")))]
+            tap_retry_at: None,
+        };
+        host.refresh_onboarding();
+        host
     }
 
     #[allow(dead_code)] // tray 「開啟設定」 on macOS / Windows; Linux starts visible
@@ -256,6 +279,7 @@ impl LailaisayHost {
             self.form = SettingsForm::from_settings(&g.settings);
             self.form.load_dictionary(&g.dictionary);
         }
+        self.refresh_onboarding();
         self.settings_visible = true;
         ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
         ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
@@ -585,6 +609,154 @@ impl LailaisayHost {
         }
     }
 
+    /// Permissions and model readiness, re-read at most every 500 ms (the TCC
+    /// probes call into the OS).
+    fn onboarding_probe(&mut self) -> onboarding::Probe {
+        if let Some((at, probe)) = self.probe_cache {
+            if at.elapsed() < Duration::from_millis(500) {
+                return probe;
+            }
+        }
+        let ready = self.shared.lock().map(|g| g.model_ready()).unwrap_or(false);
+        let probe = onboarding::Probe::read(ready);
+        self.probe_cache = Some((Instant::now(), probe));
+        probe
+    }
+
+    fn trial_pending(&self) -> bool {
+        self.shared
+            .lock()
+            .map(|g| g.settings.onboarding_pending)
+            .unwrap_or(false)
+    }
+
+    /// Decide whether the wizard is owed (launch, tray 開啟設定).
+    fn refresh_onboarding(&mut self) {
+        let probe = self.onboarding_probe();
+        let needed = onboarding::needs_wizard(Platform::current(), &probe, self.trial_pending());
+        self.onboarding_active = needed;
+        self.onboarding_done_screen = false;
+        self.trial_baseline = None;
+        self.reminder = false;
+        if needed {
+            self.form.selected_catalog_id = onboarding::recommended_model_id().to_string();
+        }
+    }
+
+    /// The step on screen. `None` is the 完成 screen.
+    fn onboarding_step(&mut self) -> Option<Step> {
+        if self.onboarding_done_screen {
+            return None;
+        }
+        let probe = self.onboarding_probe();
+        let steps = onboarding::remaining_steps(
+            Platform::current(),
+            &probe,
+            self.trial_pending(),
+            self.onboarding_welcome_seen,
+        );
+        match steps.first().copied() {
+            Some(step) => Some(step),
+            None => {
+                self.onboarding_done_screen = true;
+                None
+            }
+        }
+    }
+
+    fn hotkey_live(&self) -> bool {
+        #[cfg(all(target_os = "macos", feature = "appstore"))]
+        {
+            self.tap.as_ref().is_some_and(|t| t.last_error().is_none())
+        }
+        #[cfg(all(target_os = "macos", not(feature = "appstore")))]
+        {
+            self.tap.is_some()
+        }
+        #[cfg(target_os = "windows")]
+        {
+            self.tap.is_some()
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        {
+            true
+        }
+    }
+
+    /// Per-frame: retry the hotkey tap once permissions arrive, detect a
+    /// passed trial, keep the tray reminder current.
+    fn poll_onboarding(&mut self) {
+        #[cfg(all(target_os = "macos", not(feature = "appstore")))]
+        if self.opts.enable_tap && self.tap.is_none() {
+            let due = self.tap_retry_at.map_or(true, |at| Instant::now() >= at);
+            let probe = self.onboarding_probe();
+            if due
+                && probe.accessibility == lailaisay_input::GrantStatus::Granted
+                && probe.input_monitoring == lailaisay_input::GrantStatus::Granted
+            {
+                self.tap_retry_at = Some(Instant::now() + Duration::from_secs(3));
+                self.start_macos_tap();
+            }
+        }
+        if !self.onboarding_active {
+            let probe = self.onboarding_probe();
+            self.reminder =
+                onboarding::needs_wizard(Platform::current(), &probe, self.trial_pending());
+            return;
+        }
+        if self.onboarding_done_screen {
+            return;
+        }
+        if self.onboarding_step() != Some(Step::Trial) {
+            self.trial_baseline = None;
+            return;
+        }
+        let (count, last_final) = match self.shared.lock() {
+            Ok(g) => (g.utterance_count, g.last_final.clone()),
+            Err(_) => return,
+        };
+        let baseline = *self.trial_baseline.get_or_insert(count);
+        if onboarding::trial_passed(baseline, count, &last_final) {
+            if let Ok(mut g) = self.shared.lock() {
+                if let Err(e) = g.settings.finish_onboarding(&settings_path()) {
+                    tracing::warn!("could not persist onboarding completion ({e})");
+                }
+            }
+            self.onboarding_done_screen = true;
+            self.probe_cache = None;
+        }
+    }
+
+    fn handle_onboarding_action(&mut self, ctx: &egui::Context, action: OnboardingAction) {
+        match action {
+            OnboardingAction::None => {}
+            OnboardingAction::Next => self.onboarding_welcome_seen = true,
+            OnboardingAction::Download => self.start_catalog_download(),
+            OnboardingAction::UseModel(path) => {
+                self.form.selected_model = path;
+                self.save_settings();
+                self.probe_cache = None;
+            }
+            OnboardingAction::Relaunch => {
+                #[cfg(target_os = "macos")]
+                match crate::macos_runtime::relaunch_app() {
+                    Ok(()) => self.should_quit = true,
+                    Err(e) => {
+                        self.form.permissions_open_message = format!("無法重新啟動：{e}");
+                    }
+                }
+            }
+            OnboardingAction::Later | OnboardingAction::Finish => {
+                self.onboarding_active = false;
+                self.onboarding_done_screen = false;
+                self.probe_cache = None;
+                if self.tray_is_up() {
+                    self.hide_settings_to_tray(ctx);
+                }
+            }
+        }
+    }
+
     fn poll_session(&mut self) {
         #[cfg(any(target_os = "macos", target_os = "windows"))]
         {
@@ -805,6 +977,34 @@ impl LailaisayHost {
     }
 
     #[cfg(target_os = "macos")]
+    #[cfg(all(target_os = "macos", not(feature = "appstore")))]
+    fn start_macos_tap(&mut self) {
+        let (hotkey, edit_hotkey, double_tap) = {
+            let g = self.shared.lock().unwrap_or_else(|e| e.into_inner());
+            (
+                g.settings.hotkey.clone(),
+                g.settings.edit_hotkey.clone(),
+                g.settings.use_double_tap_only,
+            )
+        };
+        match MacOsEventTap::with_processor(HotKeyProcessor::new(hotkey.clone(), double_tap)) {
+            Ok(t) => {
+                t.set_hotkey(hotkey, double_tap);
+                t.set_edit_hotkey(edit_hotkey);
+                self.tap = Some(t);
+                set_shared_status(&self.shared, "idle");
+                eprintln!("[lailaisay-app] CGEvent tap running. Default/settings hotkey active.");
+            }
+            Err(e) => {
+                eprintln!("[lailaisay-app] hotkey tap disabled: {e}");
+                eprintln!(
+                    "[lailaisay-app] tray stays up. Grant Accessibility + Input Monitoring, then Quit and relaunch."
+                );
+                set_shared_status(&self.shared, "needs Accessibility");
+            }
+        }
+    }
+
     fn init_macos(&mut self, ctx: &egui::Context) {
         let show_dock = {
             let g = self.shared.lock().unwrap_or_else(|e| e.into_inner());
@@ -823,6 +1023,7 @@ impl LailaisayHost {
         }
 
         if self.opts.enable_tap {
+            #[cfg(feature = "appstore")]
             let (hotkey, edit_hotkey, double_tap) = {
                 let g = self.shared.lock().unwrap_or_else(|e| e.into_inner());
                 (
@@ -832,24 +1033,7 @@ impl LailaisayHost {
                 )
             };
             #[cfg(not(feature = "appstore"))]
-            match MacOsEventTap::with_processor(HotKeyProcessor::new(hotkey.clone(), double_tap)) {
-                Ok(t) => {
-                    t.set_hotkey(hotkey, double_tap);
-                    t.set_edit_hotkey(edit_hotkey);
-                    self.tap = Some(t);
-                    set_shared_status(&self.shared, "idle");
-                    eprintln!(
-                        "[lailaisay-app] CGEvent tap running. Default/settings hotkey active."
-                    );
-                }
-                Err(e) => {
-                    eprintln!("[lailaisay-app] hotkey tap disabled: {e}");
-                    eprintln!(
-                        "[lailaisay-app] tray stays up. Grant Accessibility + Input Monitoring, then Quit and relaunch."
-                    );
-                    set_shared_status(&self.shared, "needs Accessibility");
-                }
-            }
+            self.start_macos_tap();
             #[cfg(feature = "appstore")]
             match MacOsCarbonHotkey::with_processor(HotKeyProcessor::new(
                 hotkey.clone(),
@@ -972,12 +1156,17 @@ impl LailaisayHost {
             .lock()
             .map(|g| g.status.clone())
             .unwrap_or_else(|_| "…".into());
+        let suffix = if self.reminder {
+            format!("（{}）", onboarding::TRAY_REMINDER)
+        } else {
+            String::new()
+        };
         if let Some(t) = self.tray.as_mut() {
-            let _ = t.set_tooltip(Some(format!("lailaisay — {status}")));
+            let _ = t.set_tooltip(Some(format!("lailaisay — {status}{suffix}")));
             let _ = t.set_icon(Some(status_icon(tray_glyph_from_status(&status))));
         }
         if let Some(item) = self.status_item.as_ref() {
-            let _ = item.set_text(format!("lailaisay — {status}"));
+            let _ = item.set_text(format!("lailaisay — {status}{suffix}"));
         }
     }
 
@@ -1055,6 +1244,7 @@ impl eframe::App for LailaisayHost {
         self.poll_tray_menu(ctx);
 
         self.poll_download();
+        self.poll_onboarding();
         self.poll_session();
 
         #[cfg(any(target_os = "macos", target_os = "windows"))]
@@ -1112,6 +1302,37 @@ impl eframe::App for LailaisayHost {
 impl LailaisayHost {
     fn paint_settings(&mut self, ctx: &egui::Context) {
         crate::theme::paint_shell_frame(ctx);
+        if self.onboarding_active {
+            let step = self.onboarding_step();
+            let probe = self.onboarding_probe();
+            let (stt_warning, status, last_final, count) = match self.shared.lock() {
+                Ok(g) => (
+                    g.stt_warning.clone(),
+                    g.status.clone(),
+                    g.last_final.clone(),
+                    g.utterance_count,
+                ),
+                Err(_) => Default::default(),
+            };
+            let shown_final = match self.trial_baseline {
+                Some(base) if count > base => last_final,
+                _ => String::new(),
+            };
+            let hotkey_label = self.form.hotkey_label();
+            let view = OnboardingView {
+                step,
+                platform: Platform::current(),
+                probe,
+                stt_warning: &stt_warning,
+                last_final: &shown_final,
+                status: &status,
+                hotkey_label: &hotkey_label,
+                hotkey_live: self.hotkey_live(),
+            };
+            let action = self.form.show_onboarding(ctx, &view);
+            self.handle_onboarding_action(ctx, action);
+            return;
+        }
         let (stt_note, stt_warning, status, last_llm, last_raw, last_final) = match self.shared.lock() {
             Ok(g) => (
                 g.current_stt_note(),

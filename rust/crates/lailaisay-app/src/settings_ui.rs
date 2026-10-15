@@ -139,7 +139,7 @@ pub struct SettingsForm {
     pub dict_file_path: String,
     /// Last successfully loaded/saved persistable fields. Dictionary edits are excluded.
     saved: PersistableSnapshot,
-    permissions_open_message: String,
+    pub(crate) permissions_open_message: String,
 }
 
 /// Fields `apply_to` / Save write to `hex_settings.json`. Catalog + dictionary are not here.
