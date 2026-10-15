@@ -64,7 +64,7 @@ impl SettingsForm {
                             };
                             if view.step.is_some() {
                                 ui.add_space(16.0);
-                                if ghost_button(ui, "稍後再說").clicked() {
+                                if secondary_button(ui, "稍後再說").clicked() {
                                     action = OnboardingAction::Later;
                                 }
                                 note(ui, "未完成前，下次開啟 lailaisay 仍會回到這個引導。");

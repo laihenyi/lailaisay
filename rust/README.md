@@ -47,6 +47,8 @@ Optional AI polish is separate from speech recognition; Ollama is not needed for
 
 ## Existing user data
 
+First launch shows a setup wizard (choose a speech model → grant system permissions → dictate one sentence to try it). Until it is finished it reappears on every launch, and the tray shows a reminder; existing installs with a working model and permissions never see it. Manual checks: [MAC_SMOKE.md](MAC_SMOKE.md).
+
 The product name and binaries are now lailaisay. The macOS bundle identifier is now `com.yikai.lailaisay`; grant macOS permissions again after upgrading. Existing settings are retained, and an empty model cache imports weights from the legacy `xyz.2qs.Tok` cache:
 
 - macOS bundle identifier and model cache: `com.yikai.lailaisay`, `~/Library/Application Support/com.yikai.lailaisay/models`.

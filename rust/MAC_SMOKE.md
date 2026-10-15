@@ -87,6 +87,27 @@ Gatekeeper should accept the stapled app as notarized. Then smoke-test that bund
 - Restart preserves settings and models; run these checks on the Apple Silicon release bundle.
 - Enable **顯示 Dock 圖示**, quit from the tray, and relaunch. Dock must show the dark rounded square with five gold waveform bars (the AppIcon motif), not a generic letter monogram “e”. Disable the switch and relaunch: menu-bar / accessory only, no Dock tile.
 
+## 首次使用引導（手動，macOS 實機）
+
+不要動到正在使用的設定：用環境變數隔離，並只在需要時才重置權限。
+
+    export TOK_CONFIG=/tmp/lailaisay-onboarding/hex_settings.json   # 不存在 = 全新安裝
+    export TOK_MODELS_DIR=/tmp/lailaisay-onboarding/models           # 空資料夾 = 沒有模型
+    mkdir -p /tmp/lailaisay-onboarding/models
+    dist/lailaisay.app/Contents/MacOS/lailaisay-app
+
+要連權限步驟一起測，另外執行 `tccutil reset Microphone|Accessibility|ListenEvent com.yikai.lailaisay`（這會撤銷已安裝 App 的授權，測完需重新授權）。
+
+檢查項目（每項記錄實際結果）：
+1. 啟動後自動出現「歡迎使用 lailaisay」，按「開始設定」進入模型步驟。
+2. 模型步驟預設選中推薦模型；下載顯示狀態；完成後自動載入並進入權限步驟（權限已授權則直接進入試用）。
+3. 權限步驟：麥克風出現系統彈窗；輔助使用與輸入監控按「開啟」跳到系統設定；授權後該列自動變綠。
+4. 若授權後快捷鍵未啟用，出現「重新啟動 lailaisay」，按下後新實例啟動且精靈回到試用步驟。
+5. 試用步驟：按住快捷鍵說一句話，下方出現文字，自動進入「設定完成」。
+6. 按「開始使用」後視窗收到選單列；退出再開，不再出現精靈。
+7. 中途按「稍後再說」或直接結束，再開：精靈再次出現；選單列提示「需要設定」。
+8. 既有使用者（`hex_settings.json` 已存在、模型與權限正常）啟動時不出現精靈。
+
 ## Data and diagnostics
 
 The bundle identifier is `com.yikai.lailaisay`. macOS permissions must be granted again for this new identity. Existing settings remain at `~/Documents/hex_settings.json`; model files now use `~/Library/Application Support/com.yikai.lailaisay/models/`. When that cache is empty, the app copies existing weights from the legacy `xyz.2qs.Tok` cache and remaps saved model selections when the destination file exists. The settings schema and `TOK_*` overrides are described in [README.md](README.md).
