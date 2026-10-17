@@ -206,6 +206,19 @@ xcrun altool --upload-app   -f dist/lailaisay.pkg -t macos \
 - 版本號：`CFBundleShortVersionString` 對應行銷版本，`CFBundleVersion` 每次上傳遞增。
 - 審核備註要說明為何是選單列 App（`LSUIElement`）且沒有主視窗。
 
+### 5.3a App Review Guidelines 修訂（Apple 通知，2026-10 收到）
+
+送審前對照 <https://developer.apple.com/app-store/review/guidelines/> 現行全文。通知原文只列變更摘要；各條新條文的完整文字**未確認**（核實方法：開上述網頁讀 1.2、2.3.14、2.5.19、3.1.1(a)、5 全文）。下表的「對 lailaisay 的影響」是依通知摘要與本專案現況的判斷，不是 Apple 的說明。
+
+| 條款 | 通知摘要 | 對 lailaisay 的影響與送審前動作 |
+| --- | --- | --- |
+| Before/After You Submit | 新增更多文件連結 | 送審前讀新增連結。 |
+| 1.2 | 釐清適用的內容與 App 類型；未實作適當防護或收到通知後未改正，可能違反 Developer Code of Conduct | 本 App 無使用者生成內容、無社群。判斷為不適用；若日後加入分享或雲端功能須重評。 |
+| 2.3.14（新） | 創作素材（creative assets）規範 | 影響截圖、App 預覽、圖示、商店描述。送審前確認素材皆為自製、與實際 App 畫面一致。 |
+| 2.5.19（新） | 隱藏、休眠或未載明的功能（原屬 2.3.1） | **最需注意。** 所有程式內功能都須在審查備註或商店描述載明。App Store 版已移除 AI 潤稿（見 §5.0 build 5）；新增的首次使用引導、Qwen3-ASR 模型下載、「選取改寫」隱藏等也要寫進審查備註。App Store 版不得含停用但仍可被啟用的程式路徑（例如 `ai_polish_supported()` 擋掉的項目要確認不能被設定檔開啟）。 |
+| 3.1.1(a) | 外部購買連結的 entitlement 說明調整 | 本 App 免費、無內購、無外部購買連結。不適用。 |
+| 5 | 協助人口販運、剝削兒童的 App 會被下架並禁止替代發行 | 不適用。 |
+
 ## 6. 憑證到期提醒
 
 | 憑證 | 到期 |
