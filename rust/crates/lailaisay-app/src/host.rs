@@ -1015,6 +1015,7 @@ impl LailaisayHost {
         }
     }
 
+    #[cfg(target_os = "macos")]
     fn init_macos(&mut self, ctx: &egui::Context) {
         let show_dock = {
             let g = self.shared.lock().unwrap_or_else(|e| e.into_inner());
