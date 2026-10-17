@@ -309,14 +309,14 @@ mod tests {
         let ctx = egui::Context::default();
         theme::apply_visuals(&ctx);
         let mut form = SettingsForm::from_settings(&LailaisaySettings::default());
-        form.download_message = "Download failed: network".into();
+        form.download_message = "下載失敗：network".into();
         form.local_models = vec![crate::models::FoundModel {
             path: "/tmp/ggml-tiny.bin".into(),
             source: crate::models::ModelSource::Local,
         }];
         let v = view(Some(Step::Model), denied());
         let _ = paint(&ctx, &mut form, &v);
-        assert!(form.download_message.contains("failed"));
+        assert!(form.download_message.contains("下載失敗"));
         assert_eq!(form.local_models.len(), 1);
     }
 

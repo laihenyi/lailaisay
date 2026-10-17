@@ -572,7 +572,9 @@ impl LailaisayHost {
         }
         let id = self.form.selected_catalog_id.clone();
         self.form.downloading = true;
-        self.form.download_message = format!("Downloading {id}…");
+        let label = crate::models::catalog_by_id(&id)
+            .map_or_else(|| id.clone(), |entry| entry.label.to_string());
+        self.form.download_message = format!("正在下載 {label}…");
         let tx = self.download_tx.clone();
         thread::spawn(move || {
             let _ = tx.send(DownloadMsg::Done(download_catalog_model(&id)));
@@ -601,11 +603,11 @@ impl LailaisayHost {
                         );
                     } else {
                         self.form.download_message =
-                            format!("Downloaded {}. Save to make it active.", path.display());
+                            format!("已下載 {}，按「儲存設定」後啟用。", path.display());
                     }
                 }
                 Err(e) => {
-                    self.form.download_message = format!("Download failed: {e}");
+                    self.form.download_message = format!("下載失敗：{e}");
                 }
             }
         }

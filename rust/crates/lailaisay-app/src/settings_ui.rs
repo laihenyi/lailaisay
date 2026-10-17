@@ -1802,7 +1802,7 @@ fn provider_key(provider: AiProviderType) -> &'static str {
 
 fn hotkey_editor(ui: &mut Ui, id: &str, hotkey: &mut HotKey) {
     ui.push_id(id, |ui| {
-        egui::CollapsingHeader::new(format!("{}  ·  更改快捷鍵", hotkey_parts(hotkey).join(" ")))
+        egui::CollapsingHeader::new(format!("{}  ·  更改快捷鍵", hotkey_display(hotkey)))
             .id_salt("hotkey_editor")
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
@@ -2546,12 +2546,19 @@ fn catalog_row_label(entry: &CatalogEntry) -> String {
     format!("{}  —  {}  —  {state}", entry.label, entry.size_hint)
 }
 
-pub fn format_hotkey(hotkey: &HotKey) -> String {
-    let shown = if cfg!(target_os = "windows") && !hotkey.modifiers.is_empty() {
-        hotkey_parts(hotkey).join("+")
+/// One text for a chord everywhere it is shown (wizard, settings pane, status
+/// strip): `⌘ ⇧ Space` on macOS, `Ctrl+Shift+Space` on Windows.
+pub fn hotkey_display(hotkey: &HotKey) -> String {
+    let parts = hotkey_parts(hotkey);
+    if cfg!(target_os = "windows") && parts.len() > 1 {
+        parts.join("+")
     } else {
-        hotkey.to_string()
-    };
+        parts.join(" ")
+    }
+}
+
+pub fn format_hotkey(hotkey: &HotKey) -> String {
+    let shown = hotkey_display(hotkey);
     if hotkey.key.is_none() {
         if shown.is_empty() {
             "(empty)".into()
@@ -2806,6 +2813,23 @@ mod tests {
             label.contains('⌘') || label.to_ascii_lowercase().contains("space"),
             "{label}"
         );
+    }
+
+    #[test]
+    fn wizard_and_settings_pane_show_the_same_chord_text() {
+        let hk = HotKey {
+            key: Some(Key::Space),
+            modifiers: Modifiers::new([Modifier::Command, Modifier::Shift]),
+        };
+        let label = format_hotkey(&hk);
+        assert_eq!(
+            label,
+            hotkey_display(&hk),
+            "the wizard must not format the chord differently from the settings pane"
+        );
+        if !cfg!(target_os = "windows") {
+            assert_eq!(label, "⌘ ⇧ Space");
+        }
     }
 
     #[test]
