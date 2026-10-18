@@ -690,10 +690,13 @@ impl LailaisayHost {
     /// Per-frame: retry the hotkey tap once permissions arrive, detect a
     /// passed trial, keep the tray reminder current.
     fn poll_onboarding(&mut self) {
+        // Before any early return: a wizard closed with the window's X still
+        // owes setup, so the tray has to keep saying 需要設定.
+        let probe = self.onboarding_probe();
+        self.reminder = onboarding::needs_wizard(Platform::current(), &probe, self.trial_pending());
         #[cfg(all(target_os = "macos", not(feature = "appstore")))]
         if self.opts.enable_tap && self.tap.is_none() {
             let due = self.tap_retry_at.map_or(true, |at| Instant::now() >= at);
-            let probe = self.onboarding_probe();
             if due
                 && probe.accessibility == lailaisay_input::GrantStatus::Granted
                 && probe.input_monitoring == lailaisay_input::GrantStatus::Granted
@@ -703,9 +706,6 @@ impl LailaisayHost {
             }
         }
         if !self.onboarding_active {
-            let probe = self.onboarding_probe();
-            self.reminder =
-                onboarding::needs_wizard(Platform::current(), &probe, self.trial_pending());
             return;
         }
         if self.onboarding_done_screen {
@@ -715,12 +715,12 @@ impl LailaisayHost {
             self.trial_baseline = None;
             return;
         }
-        let (count, last_final) = match self.shared.lock() {
-            Ok(g) => (g.utterance_count, g.last_final.clone()),
+        let (count, last_final, from_edit) = match self.shared.lock() {
+            Ok(g) => (g.utterance_count, g.last_final.clone(), g.last_utterance_from_edit),
             Err(_) => return,
         };
         let baseline = *self.trial_baseline.get_or_insert(count);
-        if onboarding::trial_passed(baseline, count, &last_final) {
+        if onboarding::trial_passed(baseline, count, &last_final, from_edit) {
             if let Ok(mut g) = self.shared.lock() {
                 if let Err(e) = g.settings.finish_onboarding(&settings_path()) {
                     tracing::warn!("could not persist onboarding completion ({e})");

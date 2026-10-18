@@ -146,9 +146,10 @@ pub fn wizard_should_open(needed: bool, dismissed: bool) -> bool {
     needed && !dismissed
 }
 
-/// The trial passes on a new utterance whose final text is not blank.
-pub fn trial_passed(baseline: u64, count: u64, last_final: &str) -> bool {
-    count > baseline && !last_final.trim().is_empty()
+/// The trial passes on a new utterance whose final text is not blank. An edit
+/// (`Speak-to-Edit`) is not dictation and must not satisfy it.
+pub fn trial_passed(baseline: u64, count: u64, last_final: &str, last_was_edit: bool) -> bool {
+    count > baseline && !last_was_edit && !last_final.trim().is_empty()
 }
 
 #[cfg(test)]
@@ -239,11 +240,21 @@ mod tests {
     }
 
     #[test]
-    fn trial_needs_a_new_nonblank_utterance() {
-        assert!(!trial_passed(3, 3, "舊的結果"), "no new utterance yet");
-        assert!(!trial_passed(3, 4, ""), "silence is not a pass");
-        assert!(!trial_passed(3, 4, "  \n "), "whitespace is not a pass");
-        assert!(trial_passed(3, 4, "去台南。"));
+    fn trial_needs_a_new_nonblank_dictation() {
+        assert!(
+            !trial_passed(3, 3, "舊的結果", false),
+            "no new utterance yet"
+        );
+        assert!(!trial_passed(3, 4, "", false), "silence is not a pass");
+        assert!(
+            !trial_passed(3, 4, "  \n ", false),
+            "whitespace is not a pass"
+        );
+        assert!(
+            !trial_passed(3, 4, "改寫後的字", true),
+            "an edit is not a dictation"
+        );
+        assert!(trial_passed(3, 4, "去台南。", false));
     }
 
     #[test]

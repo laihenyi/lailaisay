@@ -39,6 +39,9 @@ pub struct SharedState {
     pub last_llm_note: Option<String>,
     /// Utterances finished this run (onboarding's trial step watches it).
     pub utterance_count: u64,
+    /// The last utterance was Speak-to-Edit, not dictation. The 試用 step must
+    /// not pass on an edited selection.
+    pub last_utterance_from_edit: bool,
     /// Captured at hotkey-down so paste can restore focus after a long LLM.
     pub paste_target: Option<lailaisay_paste::PasteTarget>,
 }
@@ -59,6 +62,7 @@ impl SharedState {
             last_final: String::new(),
             last_llm_note: None,
             utterance_count: 0,
+            last_utterance_from_edit: false,
             paste_target: None,
         }
     }
@@ -111,7 +115,29 @@ impl SharedState {
         final_text: impl Into<String>,
         note: Option<String>,
     ) {
+        self.record_utterance(raw, final_text, note, false);
+    }
+
+    /// Speak-to-Edit landed. Same bookkeeping as dictation, flagged so the
+    /// onboarding trial can tell an edit from a dictation.
+    pub fn set_last_edit(
+        &mut self,
+        raw: impl Into<String>,
+        final_text: impl Into<String>,
+        note: Option<String>,
+    ) {
+        self.record_utterance(raw, final_text, note, true);
+    }
+
+    fn record_utterance(
+        &mut self,
+        raw: impl Into<String>,
+        final_text: impl Into<String>,
+        note: Option<String>,
+        from_edit: bool,
+    ) {
         self.utterance_count += 1;
+        self.last_utterance_from_edit = from_edit;
         self.last_stt = raw.into();
         self.last_final = final_text.into();
         self.last_llm_note = note;
@@ -250,7 +276,7 @@ pub fn spawn_worker(shared: Arc<Mutex<SharedState>>, rx: mpsc::Receiver<Work>) {
                         match run_edit_pipeline(&selected, &instruction, &ctx).await {
                             Ok((text, note)) => {
                                 if let Ok(mut g) = shared.lock() {
-                                    g.set_last_utterance(
+                                    g.set_last_edit(
                                         instruction.clone(),
                                         text.clone(),
                                         note.clone(),
@@ -476,6 +502,15 @@ mod tests {
         st.set_last_utterance("a", "b", None);
         st.set_last_utterance("", "", None);
         assert_eq!(st.utterance_count, 2);
+        assert!(!st.last_utterance_from_edit, "dictation is not an edit");
+        st.set_last_edit("我選的字", "改寫後的字", None);
+        assert_eq!(st.utterance_count, 3);
+        assert!(
+            st.last_utterance_from_edit,
+            "Speak-to-Edit must be distinguishable for the onboarding trial"
+        );
+        st.set_last_utterance("再說一句", "再說一句。", None);
+        assert!(!st.last_utterance_from_edit, "dictation clears the flag");
 
         // A resident decoder that is only the dummy placeholder is not ready.
         st.stt = Some(Arc::new(lailaisay_stt::dummy::DummyTranscriber::new(None)));
