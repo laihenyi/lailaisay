@@ -16,7 +16,7 @@ use crate::desktop::{should_convert_minimize_to_hide, should_hide_to_tray};
 use crate::mic_start::delayed_start_still_wanted;
 #[cfg(feature = "mic")]
 use crate::mic_start::start_live_recorder_on_this_thread;
-use crate::models::download_catalog_model;
+use crate::models::download_catalog_model_with;
 use crate::pipeline::load_app_context;
 use crate::session::{Session, SessionAction};
 #[cfg(any(target_os = "macos", target_os = "windows"))]
@@ -61,6 +61,7 @@ enum Fire {
 }
 
 enum DownloadMsg {
+    Progress(crate::models::DownloadProgress),
     Done(Result<std::path::PathBuf, String>),
 }
 
@@ -575,40 +576,60 @@ impl LailaisayHost {
         let label = crate::models::catalog_by_id(&id)
             .map_or_else(|| id.clone(), |entry| entry.label.to_string());
         self.form.download_message = format!("正在下載 {label}…");
+        self.form.download_progress = None;
         let tx = self.download_tx.clone();
         thread::spawn(move || {
-            let _ = tx.send(DownloadMsg::Done(download_catalog_model(&id)));
+            let result = download_catalog_model_with(&id, |progress| {
+                let _ = tx.send(DownloadMsg::Progress(progress));
+            });
+            let _ = tx.send(DownloadMsg::Done(result));
         });
     }
 
+    /// Drain progress ticks and the final result. Progress frames arrive every
+    /// 200 ms; the bar repaints on the host's normal frame loop.
     fn poll_download(&mut self) {
-        if let Ok(DownloadMsg::Done(result)) = self.download_rx.try_recv() {
-            self.form.downloading = false;
-            match result {
-                Ok(path) => {
-                    // With no usable model loaded, activate the download right
-                    // away so the next hold-to-talk works without a separate
-                    // 儲存設定 step. Never auto-save other pending edits.
-                    let activate = !self.form.is_dirty() && {
-                        let g = self.shared.lock().unwrap_or_else(|e| e.into_inner());
-                        g.stt_is_placeholder()
-                    };
-                    self.form.selected_model = path.to_string_lossy().into_owned();
-                    self.form.refresh_models();
-                    if activate {
-                        self.save_settings();
-                        self.form.download_message = format!(
-                            "已下載並啟用 {}，背景載入完成後即可按住說話。",
-                            path.display()
-                        );
-                    } else {
-                        self.form.download_message =
-                            format!("已下載 {}，按「儲存設定」後啟用。", path.display());
-                    }
+        loop {
+            match self.download_rx.try_recv() {
+                Ok(DownloadMsg::Progress(progress)) => {
+                    self.form.download_progress = Some(progress);
                 }
-                Err(e) => {
-                    self.form.download_message = format!("下載失敗：{e}");
+                Ok(DownloadMsg::Done(result)) => {
+                    self.form.download_progress = None;
+                    self.finish_download(result);
+                    return;
                 }
+                Err(_) => return,
+            }
+        }
+    }
+
+    fn finish_download(&mut self, result: Result<std::path::PathBuf, String>) {
+        self.form.downloading = false;
+        match result {
+            Ok(path) => {
+                // With no usable model loaded, activate the download right
+                // away so the next hold-to-talk works without a separate
+                // 儲存設定 step. Never auto-save other pending edits.
+                let activate = !self.form.is_dirty() && {
+                    let g = self.shared.lock().unwrap_or_else(|e| e.into_inner());
+                    g.stt_is_placeholder()
+                };
+                self.form.selected_model = path.to_string_lossy().into_owned();
+                self.form.refresh_models();
+                if activate {
+                    self.save_settings();
+                    self.form.download_message = format!(
+                        "已下載並啟用 {}，背景載入完成後即可按住說話。",
+                        path.display()
+                    );
+                } else {
+                    self.form.download_message =
+                        format!("已下載 {}，按「儲存設定」後啟用。", path.display());
+                }
+            }
+            Err(e) => {
+                self.form.download_message = format!("下載失敗：{e}");
             }
         }
     }

@@ -123,6 +123,8 @@ pub struct SettingsForm {
     pub save_message: String,
     pub download_message: String,
     pub downloading: bool,
+    /// Live bytes of the catalog download, sampled by the download thread.
+    pub download_progress: Option<crate::models::DownloadProgress>,
     pub pane: SettingsSection,
     hotkey: HotKey,
     remote_models: std::collections::BTreeMap<String, String>,
@@ -275,6 +277,7 @@ impl SettingsForm {
             save_message: String::new(),
             download_message: String::new(),
             downloading: false,
+            download_progress: None,
             pane: SettingsSection::General,
             hotkey: settings.hotkey.clone(),
             remote_models: [
@@ -753,6 +756,7 @@ impl SettingsForm {
         if !self.download_message.is_empty() {
             note(ui, &self.download_message);
         }
+        download_progress_bar(ui, self.download_progress);
 
         action
     }
@@ -2537,6 +2541,50 @@ fn language_label(code: &str) -> String {
         .unwrap_or_else(|| format!("自訂：{code}"))
 }
 
+/// Decimal MB/GB, matching the `~1.3 GB` style of [`CatalogEntry::size_hint`].
+fn human_bytes(bytes: u64) -> String {
+    let mb = bytes as f64 / 1_000_000.0;
+    if mb >= 1000.0 {
+        format!("{:.1} GB", mb / 1000.0)
+    } else {
+        format!("{mb:.0} MB")
+    }
+}
+
+fn download_progress_text(progress: crate::models::DownloadProgress) -> String {
+    match progress.total.filter(|total| *total > 0) {
+        Some(total) => {
+            let done = progress.done.min(total);
+            let percent = ((done as f64 / total as f64) * 100.0).round() as u32;
+            format!(
+                "已下載 {}／{}（{percent}%）",
+                human_bytes(done),
+                human_bytes(total)
+            )
+        }
+        None => format!("已下載 {}", human_bytes(progress.done)),
+    }
+}
+
+/// Bar while a catalog model downloads. Falls back to a text line when the CDN
+/// did not tell us the size, so the pane never shows a bar stuck at 0%.
+fn download_progress_bar(ui: &mut Ui, progress: Option<crate::models::DownloadProgress>) {
+    let Some(progress) = progress else { return };
+    let text = download_progress_text(progress);
+    match progress.total.filter(|total| *total > 0) {
+        Some(total) => {
+            let fraction = (progress.done.min(total) as f32 / total as f32).clamp(0.0, 1.0);
+            ui.add(
+                egui::ProgressBar::new(fraction)
+                    .desired_height(theme::ROW_H * 0.6)
+                    .fill(theme::GLASS_TINT)
+                    .text(egui::RichText::new(text).color(FG)),
+            );
+        }
+        None => note(ui, &text),
+    }
+}
+
 fn catalog_row_label(entry: &CatalogEntry) -> String {
     let state = if catalog_is_downloaded(entry) {
         "已下載"
@@ -2812,6 +2860,35 @@ mod tests {
         assert!(
             label.contains('⌘') || label.to_ascii_lowercase().contains("space"),
             "{label}"
+        );
+    }
+
+    #[test]
+    fn download_progress_text_shows_bytes_percent_and_an_honest_missing_total() {
+        use crate::models::DownloadProgress;
+        let half = DownloadProgress {
+            done: 650_000_000,
+            total: Some(1_300_000_000),
+        };
+        assert_eq!(download_progress_text(half), "已下載 650 MB／1.3 GB（50%）");
+        let unknown = DownloadProgress {
+            done: 12_000_000,
+            total: None,
+        };
+        assert_eq!(download_progress_text(unknown), "已下載 12 MB");
+        let no_total = DownloadProgress {
+            done: 0,
+            total: Some(0),
+        };
+        assert_eq!(download_progress_text(no_total), "已下載 0 MB", "never a 0% bar");
+        let over = DownloadProgress {
+            done: 2_000_000_000,
+            total: Some(1_300_000_000),
+        };
+        assert!(
+            download_progress_text(over).contains("100%"),
+            "CDN total and file size can disagree: {}",
+            download_progress_text(over)
         );
     }
 

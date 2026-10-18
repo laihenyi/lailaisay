@@ -121,6 +121,7 @@ impl SettingsForm {
         if !self.download_message.is_empty() {
             note(ui, &self.download_message);
         }
+        download_progress_bar(ui, self.download_progress);
         if !view.stt_warning.is_empty() {
             danger_note(ui, view.stt_warning);
         }
@@ -318,6 +319,28 @@ mod tests {
         let _ = paint(&ctx, &mut form, &v);
         assert!(form.download_message.contains("下載失敗"));
         assert_eq!(form.local_models.len(), 1);
+    }
+
+    #[test]
+    fn model_step_paints_a_running_download_and_keeps_its_progress() {
+        let ctx = egui::Context::default();
+        theme::apply_visuals(&ctx);
+        let mut form = SettingsForm::from_settings(&LailaisaySettings::default());
+        form.downloading = true;
+        form.download_message = "正在下載 Qwen3-ASR 1.7B Q4（推薦）…".into();
+        form.download_progress = Some(crate::models::DownloadProgress {
+            done: 650_000_000,
+            total: Some(1_300_000_000),
+        });
+        let v = view(Some(Step::Model), denied());
+        let action = paint(&ctx, &mut form, &v);
+        assert_eq!(action, OnboardingAction::None, "no click while downloading");
+        assert!(form.downloading, "the bar must not look finished");
+        assert_eq!(
+            form.download_progress.map(|p| p.done),
+            Some(650_000_000),
+            "painting must not reset the sampled progress"
+        );
     }
 
     #[test]

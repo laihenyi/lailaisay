@@ -1,7 +1,8 @@
 //! Discover, catalog, and download ggml/gguf files for the settings model menu.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 use lailaisay_core::{models_dir, remapped_selected_whisper_model, LailaisaySettings};
 
@@ -353,6 +354,25 @@ pub fn download_whisper_tiny() -> Result<PathBuf, String> {
 
 /// Download a catalog ggml into [`models_dir`]. Does not commit the file.
 pub fn download_catalog_model(id: &str) -> Result<PathBuf, String> {
+    download_catalog_model_with(id, |_| {})
+}
+
+/// Bytes on disk so far, plus the server's total when the CDN told us.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct DownloadProgress {
+    pub done: u64,
+    pub total: Option<u64>,
+}
+
+/// How often [`download_catalog_model_with`] samples the partial file.
+const PROGRESS_TICK: Duration = Duration::from_millis(200);
+
+/// [`download_catalog_model`] that reports progress while curl runs, so the
+/// Settings and onboarding panes can draw a bar instead of a static 「下載中…」.
+pub fn download_catalog_model_with(
+    id: &str,
+    mut report: impl FnMut(DownloadProgress),
+) -> Result<PathBuf, String> {
     let entry = catalog_by_id(id).ok_or_else(|| format!("unknown catalog model {id:?}"))?;
     let dest = catalog_dest(entry);
     if file_looks_complete(&dest, entry.min_bytes) {
@@ -376,14 +396,30 @@ pub fn download_catalog_model(id: &str) -> Result<PathBuf, String> {
     let url = catalog_url(entry);
     let tmp = dest.with_extension("bin.partial");
     let _ = std::fs::remove_file(&tmp);
-    let status = Command::new("curl")
+    let total = remote_content_length(&url);
+    // curl's own meter goes to stderr, which is a log file or /dev/null for the
+    // GUI; the caller's bar is the user-facing progress.
+    let mut child = Command::new("curl")
         .args(["-fL", "--retry", "3", "--retry-delay", "2", "-o"])
         .arg(&tmp)
         .arg(&url)
-        .status()
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
         .map_err(|e| {
             format!("curl failed ({e}); install curl or set TOK_WHISPER_MODEL_BASE_URL")
         })?;
+    report(DownloadProgress { done: 0, total });
+    let status = loop {
+        match child.try_wait().map_err(|e| e.to_string())? {
+            Some(status) => break status,
+            None => {
+                let done = std::fs::metadata(&tmp).map(|m| m.len()).unwrap_or(0);
+                report(DownloadProgress { done, total });
+                std::thread::sleep(PROGRESS_TICK);
+            }
+        }
+    };
     if !status.success() {
         let _ = std::fs::remove_file(&tmp);
         return Err(format!("curl exited {status} for {}", entry.filename));
@@ -397,7 +433,38 @@ pub fn download_catalog_model(id: &str) -> Result<PathBuf, String> {
         ));
     }
     std::fs::rename(&tmp, &dest).map_err(|e| e.to_string())?;
+    report(DownloadProgress { done: len, total: Some(len) });
     Ok(dest)
+}
+
+/// `Content-Length` of the final response (best effort: redirect hops and
+/// missing headers just mean "no total", not a failed download).
+fn remote_content_length(url: &str) -> Option<u64> {
+    let started = Instant::now();
+    let out = Command::new("curl")
+        .args(["-sIL", "--max-time", "15", url])
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    if !out.status.success() || started.elapsed() > Duration::from_secs(20) {
+        return None;
+    }
+    parse_content_length(&String::from_utf8_lossy(&out.stdout))
+}
+
+/// The last `content-length:` wins: with `-L` curl prints one header block per
+/// hop and only the final one describes the file.
+fn parse_content_length(headers: &str) -> Option<u64> {
+    let mut total = None;
+    for line in headers.lines() {
+        let Some((name, value)) = line.split_once(':') else {
+            continue;
+        };
+        if name.trim().eq_ignore_ascii_case("content-length") {
+            total = value.trim().parse::<u64>().ok().filter(|n| *n > 0);
+        }
+    }
+    total
 }
 
 fn find_download_script() -> Option<PathBuf> {
@@ -430,6 +497,22 @@ mod tests {
     use std::sync::Mutex;
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn content_length_uses_the_last_hop_and_ignores_junk() {
+        let headers = concat!(
+            "HTTP/2 302\r\n",
+            "location: https://cdn.example/x.gguf\r\n",
+            "content-length: 0\r\n",
+            "\r\n",
+            "HTTP/2 200\r\n",
+            "Content-Length: 1319830496\r\n",
+        );
+        assert_eq!(parse_content_length(headers), Some(1_319_830_496));
+        assert_eq!(parse_content_length("HTTP/2 200\r\n"), None);
+        assert_eq!(parse_content_length("content-length: nonsense"), None);
+        assert_eq!(parse_content_length(""), None);
+    }
 
     #[test]
     fn qwen_catalog_entries_use_their_own_repos_and_never_whisper_urls() {

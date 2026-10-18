@@ -126,7 +126,9 @@ Gatekeeper should accept the stapled app as notarized. Then smoke-test that bund
 
 - 熱鍵文字：引導頁與一般設定頁都顯示 `⌘ ⇧ Space`（先前引導頁是 `⌘⇧SPACE`）。
 - 選單列提醒：精靈開著、或被收進選單列卻沒按「稍後再說」時，選單列仍顯示「需要設定，請開啟設定繼續」；由選單列「開啟設定」會回到精靈。
-- macOS 版在 App 失去前景時會把設定視窗 `orderOut`，所以用 AX 讀畫面或按按鈕前要先把該 PID 拉到前景（`NSRunningApplication.activate` ＋ `AXRaiseAction`），否則 `AXWindows` 會是空的。
+- macOS 版在 App 失去前景時會把設定視窗 `orderOut`，所以用 AX 讀畫面或按按鈕前要先把該 PID 拉到前景（實測用 System Events 的 `set frontmost` 最可靠；`NSRunningApplication.activate` 在沒有前景權時會被忽略），否則 `AXWindows` 會是空的。
+- 模型下載（2026-10-18 起）有進度條：`AXProgressIndicator` 顯示「已下載 32 MB／488 MB（6%）」→「105 MB（22%）」→…「443 MB（91%）」，下載完成後消失並自動進入下一步；引導頁的模型步驟與「設定 → 語音模型 → 下載所選」兩處都驗過。
+
 
 ## Data and diagnostics
 
