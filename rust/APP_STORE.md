@@ -219,6 +219,45 @@ xcrun altool --upload-app   -f dist/lailaisay.pkg -t macos \
 | 3.1.1(a) | 外部購買連結的 entitlement 說明調整 | 本 App 免費、無內購、無外部購買連結。不適用。 |
 | 5 | 協助人口販運、剝削兒童的 App 會被下架並禁止替代發行 | 不適用。 |
 
+### 5.3b 審查備註草稿（2.5.19 用）
+
+Apple 的 Review Notes 用英文寫。送審時整段貼上，並依當版實際功能增刪；只要動到使用者看得到的東西（新的引導步驟、新的下載、刪掉的面板、隱藏的入口），這段就要一起改，否則就違反 §5.3a 表裡的 2.5.19。
+
+```text
+lailaisay is a menu-bar dictation utility (LSUIElement, no main window). Hold the
+hotkey, speak, release: the speech is transcribed on the device by whisper.cpp or
+Qwen3-ASR and the text is put on the clipboard. This build never captures the
+screen, never sends audio off the device, and has no account, no ads, no in-app
+purchases and no tracking.
+
+First launch (also described in the App Store description):
+1. A three-step setup window opens by itself.
+   - 選擇語音模型 — choose a speech-recognition model. The recommended one
+     (Qwen3-ASR 1.7B Q4, ~1.3 GB) is downloaded once over HTTPS from
+     huggingface.co/handy-computer; whisper.cpp models come from
+     huggingface.co/ggerganov/whisper.cpp. A model already on the Mac can be used
+     instead. Only a model file is downloaded — no audio is uploaded, and nothing
+     else is downloaded later unless the user picks another model.
+   - 開啟系統權限 — microphone only in this build, with a button that opens the
+     matching System Settings pane.
+   - 試用一下 — hold the hotkey and say one sentence; the recognized text appears in
+     the window and setup is complete.
+   The window can be dismissed with 稍後再說 (set up later) and returns on the next
+   launch until a sentence has been transcribed.
+2. Afterwards the app stays in the menu bar. Its menu holds 開啟設定 (Settings) and
+   結束 (Quit).
+
+Specific to this build:
+- Only the microphone permission is used. There is no Accessibility or Automation
+  use and no automatic pasting: the transcript is copied to the clipboard and the
+  user pastes with Command-V.
+- No AI text rewriting and no third-party AI service is bundled or reachable in this
+  build; that settings pane is absent, not merely disabled.
+- Every settings pane visible in the app (一般 / 語音模型 / 自訂辭典 / 權限) maps to a
+  feature described in the App Store listing. There are no hidden or dormant
+  features, and no setting file key can re-enable a feature that this build omits.
+```
+
 ## 6. 憑證到期提醒
 
 | 憑證 | 到期 |
