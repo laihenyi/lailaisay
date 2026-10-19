@@ -111,6 +111,8 @@ rust/fastlane/screenshots/zh-Hant/*.png
 | 2026-10-11 | 1.1 (6) | 新增 Qwen3-ASR（transcribe.cpp 動態函式庫放 `Contents/Frameworks`，模型不內建、由選單下載）。審查備註超過 4000 字元上限（`fastlane mac release` 的 metadata 步驟報錯）→ 刪掉 build 4 的歷史段落；`sync_screenshots` 需 `FASTLANE_ENABLE_BETA_DELIVER_SYNC_SCREENSHOTS=1`。pkg 上傳後處理 VALID（含巢狀 dylib 的商店簽署通過 ASC 處理）。`asc review submit --build-id fcf6820d-9767-47be-8078-fb7c9aaef240 --confirm` 送審，狀態 WAITING_FOR_REVIEW（提交 2026-10-11 13:32 UTC，submission `84e79ab8-9a81-4697-ad50-798b86e5518a`）。釋出方式仍為手動 |
 | 2026-10-13 | 1.1 (6) | **已上架**：ASC 原始 API `appStoreVersions` 的 1.0／1.1 都是 `READY_FOR_SALE`；公開商店（iTunes lookup `id6814312066`）顯示 `version=1.1`、`currentVersionReleaseDate=2026-10-12T22:23Z`（台北 10-13 06:23）、`releaseDate=2026-09-29`、免費。注意 `asc status` 的摘要會把已發佈版本寫成 `READY_FOR_DISTRIBUTION`，那是 CLI 的顯示差異，以原始 API 與公開商店為準 |
 
+| 2026-10-19 | 1.2 (7) | 首次使用引導上架送審。`macos/Info.plist` 1.2／build 7；`./scripts/package-macos-app.sh --app-store` 產 pkg（22.8 MB，App Store 簽章）；`fastlane mac release` 上傳 pkg＋metadata＋截圖（metadata 步驟自動建立 1.2 版本紀錄）；build 7 約 2 分鐘 `VALID`；`asc validate --version 1.2` 只剩「no build attached」一條阻擋；`asc review submit --build-id 45ccdb9a-67a8-4a90-9fca-c19e73368aa8 --confirm` 綁定並送審，submission `e139d4ed-f5bd-45f7-a7d9-168deba90c7b`（2026-10-19 14:59 UTC），狀態 `WAITING_FOR_REVIEW`。審查備註回讀 3,164 字元、含 1.2 段與「no third-party AI service」聲明。釋出方式仍為手動 |
+
 ### 5.4 之後每次更新的標準流程
 
 1. 改碼、測試（`cargo test --workspace --features lailaisay-stt/process-whisper`，並以 `--features appstore` 重跑 app/paste crate 測試）。
@@ -231,17 +233,18 @@ xcrun altool --upload-app   -f dist/lailaisay.pkg -t macos \
 - 設定頁看得到的每一頁都要對得上商店描述（一般／語音模型／自訂辭典／權限）。
 - 被 `ai_polish_supported()`、`speak_to_edit_supported()` 移除的路徑不能被設定檔重新開啟。
 
-## 7. 1.2 送審準備（2026-10-18 起）
+## 7. 1.2 送審準備（已於 2026-10-19 送審）
 
 - 版本號：`macos/Info.plist` 已是 `1.2` / build `7`（ASC 上最新是 1.1 的 build 6）。
 - 已改：`fastlane/metadata/{zh-Hant,en-US}/release_notes.txt` 換成 1.2 的引導與下載進度條說明；`review_information/notes.txt` 換成 1.2 版（三步引導、新的測試步驟、仍無 AI 潤稿），3,165 字元。
 - 聲明清單：§5.3b。商店描述（`description.txt`）本來就寫了「首次啟動選擇並下載語音模型／允許麥克風」，1.2 上架後才完全對得上。
-- 待做（都要人工確認或授權）：
-  1. `./scripts/package-macos-app.sh --app-store` → `dist/lailaisay.pkg`（會用 `macos/lailaisay-appstore.entitlements` 與已提交的 profile）。
-  2. `fastlane mac release` — 上傳 pkg、metadata（含上面的審查備註）與截圖；ASC 沒有 1.2 版本紀錄時 deliver 會自動建立。
-  3. build 變 `VALID` 後：`fastlane mac submit_review`，或 `asc review submit --app 6814312066 --platform MAC_OS --version 1.2 --build-id <buildId> --confirm`（先 `--dry-run`）。
-  4. `asc validate --app 6814312066 --version 1.2 --platform MAC_OS` 只能在版本紀錄存在之後跑（`release` 之後、送審之前）。
-  5. 通過後版本是手動發佈：`asc versions release --version-id <versionId> --confirm`。
+- 已完成（2026-10-19）：
+  1. `./scripts/package-macos-app.sh --app-store` → `dist/lailaisay.pkg`（22.8 MB；sandbox 簽章、profile 已嵌入、私有 API 只剩可忽略的 `_CGShieldingWindowLevel`）。
+  2. `fastlane mac release`（`FASTLANE_ENABLE_BETA_DELIVER_SYNC_SCREENSHOTS=1`）上傳 pkg＋metadata＋截圖，deliver 自動建立 1.2 版本紀錄 `6f97c571-9867-423d-a96b-46161edfeb8d`。
+  3. build 7（`45ccdb9a-67a8-4a90-9fca-c19e73368aa8`）處理約 2 分鐘後 `VALID`。
+  4. `asc validate --version 1.2` → 1 個阻擋（no build attached）＋2 個 info（手動發佈、App Privacy 無法由 API 驗證）。
+  5. `asc review submit --build-id … --dry-run` 預覽後 `--confirm` 送審：submission `e139d4ed-f5bd-45f7-a7d9-168deba90c7b`，版本 `WAITING_FOR_REVIEW`，審查備註回讀確認是 1.2 版（3,164 字元）。
+- 待做：審核通過後手動發佈 `asc versions release --version-id 6f97c571-9867-423d-a96b-46161edfeb8d --confirm`；若被拒，照 §5.4 第 9 點的流程遞增 build 重送。
 - 已知不阻擋：en-US 沒有任何截圖集（ASC 上 1.1 只有 zh-Hant 的 `APP_DESKTOP` 一組，審核仍通過）。要補就放 `fastlane/screenshots/en-US/*.png` 後 `asc screenshots upload --app 6814312066 --version 1.2 --locale en-US --path fastlane/screenshots/en-US --device-type APP_DESKTOP`。
 - App Store 版只要求麥克風權限，試用步驟的輸出是剪貼簿（使用者自己按 ⌘V）。
 
