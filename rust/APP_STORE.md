@@ -109,6 +109,7 @@ rust/fastlane/screenshots/zh-Hant/*.png
 | 2026-09-27 | 1.0 (5) | 重送：被拒狀態下 Resolution Center 訊息線（submission details 頁「訊息」區）**沒有開發者回覆輸入框**（被拒與 DEVELOPER_REJECTED 狀態下 DOM 皆確認無 textarea／回覆按鈕；4 則訊息全是 Apple 來信）——Apple 信中要求的「reply to this rejection to confirm」實務上只能靠審查備註（App Review Information）承載，BUILD 5 段已完整聲明不含第三方 AI 服務。途中曾以版本頁「將此版本從審查中移除」實驗找回覆框（版本回 DEVELOPER_REJECTED），確認無果後「重新提交審查 → 提交以供審查（1.0 (5)）」重送，狀態 WAITING_FOR_REVIEW |
 | 2026-10-02 | 1.0 (5) | **已上架**：ASC API `appStoreState=READY_FOR_SALE`（手動發佈已完成）。同日處理 Apple「Developer ID Sub-CA 2027-02-01 到期」通知：以 Account Holder 網頁建立 G2 Developer ID Application 憑證（API 建立回 403）、本機鑰匙圈刪除舊憑證（`developerID_2022.p12` 已備份）、`package-macos-app.sh --developer-id` + `notarize-macos.sh` 實跑通過（notarytool Accepted `bc5d6771-efe9-4477-ba42-14d73399101c`、staple OK、`spctl` = Notarized Developer ID）。Developer Portal 上的舊憑證刻意不撤銷，讓它自然到期 |
 | 2026-10-11 | 1.1 (6) | 新增 Qwen3-ASR（transcribe.cpp 動態函式庫放 `Contents/Frameworks`，模型不內建、由選單下載）。審查備註超過 4000 字元上限（`fastlane mac release` 的 metadata 步驟報錯）→ 刪掉 build 4 的歷史段落；`sync_screenshots` 需 `FASTLANE_ENABLE_BETA_DELIVER_SYNC_SCREENSHOTS=1`。pkg 上傳後處理 VALID（含巢狀 dylib 的商店簽署通過 ASC 處理）。`asc review submit --build-id fcf6820d-9767-47be-8078-fb7c9aaef240 --confirm` 送審，狀態 WAITING_FOR_REVIEW（提交 2026-10-11 13:32 UTC，submission `84e79ab8-9a81-4697-ad50-798b86e5518a`）。釋出方式仍為手動 |
+| 2026-10-13 | 1.1 (6) | **已上架**：ASC 原始 API `appStoreVersions` 的 1.0／1.1 都是 `READY_FOR_SALE`；公開商店（iTunes lookup `id6814312066`）顯示 `version=1.1`、`currentVersionReleaseDate=2026-10-12T22:23Z`（台北 10-13 06:23）、`releaseDate=2026-09-29`、免費。注意 `asc status` 的摘要會把已發佈版本寫成 `READY_FOR_DISTRIBUTION`，那是 CLI 的顯示差異，以原始 API 與公開商店為準 |
 
 ### 5.4 之後每次更新的標準流程
 
@@ -219,44 +220,30 @@ xcrun altool --upload-app   -f dist/lailaisay.pkg -t macos \
 | 3.1.1(a) | 外部購買連結的 entitlement 說明調整 | 本 App 免費、無內購、無外部購買連結。不適用。 |
 | 5 | 協助人口販運、剝削兒童的 App 會被下架並禁止替代發行 | 不適用。 |
 
-### 5.3b 審查備註草稿（2.5.19 用）
+### 5.3b 審查備註（2.5.19 用）
 
-Apple 的 Review Notes 用英文寫。送審時整段貼上，並依當版實際功能增刪；只要動到使用者看得到的東西（新的引導步驟、新的下載、刪掉的面板、隱藏的入口），這段就要一起改，否則就違反 §5.3a 表裡的 2.5.19。
+實際上傳的文字是 `fastlane/metadata/review_information/notes.txt`（`fastlane mac release` 會一起上傳，Apple 上限 4000 字元；1.2 版 3,165 字元）。2.5.19 要求程式內的每個功能都要在審查備註或商店描述裡說清楚，所以每次改到使用者看得到的功能，先對這張清單，再改那個檔案：
 
-```text
-lailaisay is a menu-bar dictation utility (LSUIElement, no main window). Hold the
-hotkey, speak, release: the speech is transcribed on the device by whisper.cpp or
-Qwen3-ASR and the text is put on the clipboard. This build never captures the
-screen, never sends audio off the device, and has no account, no ads, no in-app
-purchases and no tracking.
+- 選單列 App（`LSUIElement`）、無帳號、免費、無內購、無廣告、無追蹤。
+- 語音只在本機辨識（whisper.cpp／Qwen3-ASR），唯一的網路連線是從 Hugging Face 一次性下載模型檔，音訊與文字不上傳。
+- 首次使用引導的三步（選模型／開麥克風／試說一句）、可以「稍後再說」、完成前選單列顯示「需要設定」，以及下載進度條。
+- 這個建置**沒有**的東西要明講：自動貼上（只複製）、AI 潤稿與任何第三方 AI 服務、選取改寫。
+- 設定頁看得到的每一頁都要對得上商店描述（一般／語音模型／自訂辭典／權限）。
+- 被 `ai_polish_supported()`、`speak_to_edit_supported()` 移除的路徑不能被設定檔重新開啟。
 
-First launch (also described in the App Store description):
-1. A three-step setup window opens by itself.
-   - 選擇語音模型 — choose a speech-recognition model. The recommended one
-     (Qwen3-ASR 1.7B Q4, ~1.3 GB) is downloaded once over HTTPS from
-     huggingface.co/handy-computer; whisper.cpp models come from
-     huggingface.co/ggerganov/whisper.cpp. A model already on the Mac can be used
-     instead. Only a model file is downloaded — no audio is uploaded, and nothing
-     else is downloaded later unless the user picks another model.
-   - 開啟系統權限 — microphone only in this build, with a button that opens the
-     matching System Settings pane.
-   - 試用一下 — hold the hotkey and say one sentence; the recognized text appears in
-     the window and setup is complete.
-   The window can be dismissed with 稍後再說 (set up later) and returns on the next
-   launch until a sentence has been transcribed.
-2. Afterwards the app stays in the menu bar. Its menu holds 開啟設定 (Settings) and
-   結束 (Quit).
+## 7. 1.2 送審準備（2026-10-18 起）
 
-Specific to this build:
-- Only the microphone permission is used. There is no Accessibility or Automation
-  use and no automatic pasting: the transcript is copied to the clipboard and the
-  user pastes with Command-V.
-- No AI text rewriting and no third-party AI service is bundled or reachable in this
-  build; that settings pane is absent, not merely disabled.
-- Every settings pane visible in the app (一般 / 語音模型 / 自訂辭典 / 權限) maps to a
-  feature described in the App Store listing. There are no hidden or dormant
-  features, and no setting file key can re-enable a feature that this build omits.
-```
+- 版本號：`macos/Info.plist` 已是 `1.2` / build `7`（ASC 上最新是 1.1 的 build 6）。
+- 已改：`fastlane/metadata/{zh-Hant,en-US}/release_notes.txt` 換成 1.2 的引導與下載進度條說明；`review_information/notes.txt` 換成 1.2 版（三步引導、新的測試步驟、仍無 AI 潤稿），3,165 字元。
+- 聲明清單：§5.3b。商店描述（`description.txt`）本來就寫了「首次啟動選擇並下載語音模型／允許麥克風」，1.2 上架後才完全對得上。
+- 待做（都要人工確認或授權）：
+  1. `./scripts/package-macos-app.sh --app-store` → `dist/lailaisay.pkg`（會用 `macos/lailaisay-appstore.entitlements` 與已提交的 profile）。
+  2. `fastlane mac release` — 上傳 pkg、metadata（含上面的審查備註）與截圖；ASC 沒有 1.2 版本紀錄時 deliver 會自動建立。
+  3. build 變 `VALID` 後：`fastlane mac submit_review`，或 `asc review submit --app 6814312066 --platform MAC_OS --version 1.2 --build-id <buildId> --confirm`（先 `--dry-run`）。
+  4. `asc validate --app 6814312066 --version 1.2 --platform MAC_OS` 只能在版本紀錄存在之後跑（`release` 之後、送審之前）。
+  5. 通過後版本是手動發佈：`asc versions release --version-id <versionId> --confirm`。
+- 已知不阻擋：en-US 沒有任何截圖集（ASC 上 1.1 只有 zh-Hant 的 `APP_DESKTOP` 一組，審核仍通過）。要補就放 `fastlane/screenshots/en-US/*.png` 後 `asc screenshots upload --app 6814312066 --version 1.2 --locale en-US --path fastlane/screenshots/en-US --device-type APP_DESKTOP`。
+- App Store 版只要求麥克風權限，試用步驟的輸出是剪貼簿（使用者自己按 ⌘V）。
 
 ## 6. 憑證到期提醒
 
