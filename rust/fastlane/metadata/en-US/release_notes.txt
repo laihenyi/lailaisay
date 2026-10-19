@@ -1,8 +1,8 @@
-1.1 adds Qwen3-ASR as a speech model option (downloaded by you, runs entirely on your Mac).
+1.2 turns the first launch into a three-step setup: choose a speech model → allow the microphone → dictate one sentence.
 
-• Settings → Speech Model → Catalog download: choose Qwen3-ASR 1.7B or 0.6B alongside Whisper and switch any time
-• In our tests, short dictation is noticeably faster than Whisper large-v3-turbo (results vary by Mac)
-• Your custom dictionary is passed to Qwen as recognition hints
-• If a Qwen model cannot load, the app falls back to Whisper and explains why in Settings
+• The setup window opens by itself on first launch and hands you back to the menu bar when it is done; 稍後再說 (set up later) postpones it, and it returns on the next launch
+• Model downloads now show a progress bar with bytes transferred and percent complete
+• If a model fails to load, the reason is shown in the window; with no network you can pick a model already on your Mac
+• Until setup is complete, the menu bar title says 需要設定 (setup needed)
 
-Qwen3-ASR is released by the Alibaba Qwen team under Apache-2.0. It runs on your Mac; no recording or text is uploaded. The only network connection is still downloading model files from Hugging Face.
+No new permissions and no new connections in this update. Speech recognition still runs entirely on your Mac; the only network connection remains downloading model files from Hugging Face.

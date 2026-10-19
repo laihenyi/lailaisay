@@ -1,27 +1,28 @@
-lailaisay is a press-and-hold voice dictation utility for macOS. No account or sign-in is required. It is a menu bar app (LSUIElement) with a Dock icon; the settings window opens from the menu bar icon → 設定 (Settings), or automatically on first launch.
+lailaisay is a press-and-hold voice dictation utility for macOS. No account or sign-in is required. It is a menu bar app (LSUIElement) with a Dock icon; the settings window opens from the menu bar icon → 設定 (Settings), or from the setup window described below on first launch.
 
-CHANGES IN VERSION 1.1 (BUILD 6)
-This update adds one more speech model choice: Qwen3-ASR (GGUF files, Apache-2.0, released by the Alibaba Qwen team), run on-device through the ggml-based transcribe.cpp library (MIT) that is bundled in Contents/Frameworks. It is a local speech-recognition model like Whisper, not an online AI service: the app still sends no audio, text or personal data anywhere. Like the Whisper models, Qwen3-ASR files are NOT bundled; the user downloads one from huggingface.co (Settings → 語音模型 → 目錄下載, entries named "Qwen3-ASR …") and picks it under 使用模型. The default flow below (Whisper "small") is unchanged and is the simplest path to test. If a Qwen model cannot be loaded, the app falls back to a Whisper model and shows the reason in the same pane. The AI polish feature is still absent from this build.
+CHANGES IN VERSION 1.2 (BUILD 7)
+The first launch is now a three-step setup window instead of the general settings window:
+1. 選擇語音模型 — pick a speech model; the recommended one is downloaded once from huggingface.co, with a progress bar showing bytes and percent. A model already on the Mac is offered as an alternative when there is no network.
+2. 開啟系統權限 — microphone only, with a button that opens the matching System Settings pane.
+3. 試用一下 — hold the hotkey and say one sentence; the recognized text appears in the window and setup is complete.
+The window can be postponed with 稍後再說 and returns on the next launch until a sentence has been transcribed. Until then the menu bar title says 需要設定 (setup needed). No new permissions, no new network endpoints and no new data collection: the only network use is still the one-time model download from huggingface.co. The AI polish feature is still absent from this build (removed in build 5).
 
-CHANGES IN BUILD 5 (response to the 5.1.1(i)/5.1.2(i) review of build 4)
-This build REMOVES the optional AI polish (「AI 潤稿」) feature from the Mac App Store build entirely: the settings pane is gone and the pipeline forces polish off, so the app contains no third-party AI service and never sends any user data to one. Speech recognition runs fully on-device with the bundled whisper.cpp; the app's only network connection is the one-time model download (Whisper, or optionally Qwen3-ASR) from huggingface.co, which carries no personal data. The App Privacy answers ("Data Not Collected") are therefore accurate. The AI polish feature remains available only in the direct-download (Developer ID) build, where the user configures it explicitly; the privacy policy at the URL below now states the App Store distinction explicitly.
+HOW TO TEST (first launch)
+1. Launch the app: the setup window opens by itself and shows 歡迎使用 lailaisay. Press 開始設定 (Start setup).
+2. 選擇語音模型: keep the recommended entry or pick "small" (about 466 MB) and press 下載並使用 (Download and use). A progress bar shows 已下載 … MB／… MB (…%) until the download finishes and the model loads.
+3. 開啟系統權限: only the microphone row appears. Allow Microphone access; the row turns green.
+4. 試用一下: press and HOLD ⌘⇧Space, speak (Traditional Chinese or English), release. The recognized text appears in the window and the wizard shows 設定完成 (Setup complete). Press 開始使用 (Start using).
+5. Open any app with a text field (TextEdit or Notes), hold ⌘⇧Space, speak, release. The status shows a green 已複製 (Copied); the transcript is on the clipboard, paste it with ⌘V. This build never injects keystrokes into other apps.
 
-HOW TO TEST
-1. Launch the app and allow Microphone access when prompted.
-2. In Settings → 語音模型 (Speech Model), under 目錄下載 (Catalog download) keep "small" (about 466 MB) selected and click 下載所選 (Download selected). The model is downloaded once from huggingface.co into the app's sandbox container and becomes active automatically when the download finishes (the line 目前載入 shows ggml-small.bin).
-3. Open any app with a text field (e.g. TextEdit or Notes).
-4. Press and HOLD ⌘⇧Space, speak (Traditional Chinese or English), then release.
-5. The status in the Settings window changes to a green 已複製 (Copied). Press ⌘V to paste the recognized text.
+Speech recognition runs entirely on-device with whisper.cpp (Metal) or, if the user chooses it, Qwen3-ASR via the bundled transcribe.cpp (Metal). If dictation produces no speech, the status still stays green.
 
-If you dictate before a model is downloaded, the status shows 需要語音模型 (Speech model needed) with a pointer to the 語音模型 pane.
-
-Speech recognition runs entirely on-device with whisper.cpp (Metal) or, if the user chooses it, Qwen3-ASR via transcribe.cpp (Metal). The Mac App Store build has no AI polish feature and sends no data to any AI service. If dictation produces no speech, the status still stays green.
+Earlier versions: build 6 added Qwen3-ASR as an optional model (GGUF, Apache-2.0, Alibaba Qwen team). Build 5 removed the optional AI polish feature from this build entirely, so no third-party AI service is bundled or reachable, and the App Privacy answers ("Data Not Collected") are accurate.
 
 SANDBOX ENTITLEMENTS
 - com.apple.security.device.audio-input: microphone recording while the hotkey is held.
 - com.apple.security.network.client: one-time speech model download (Whisper or Qwen3-ASR) from huggingface.co (the app's only network use).
 - com.apple.security.files.user-selected.read-only: importing a custom-dictionary JSON file chosen by the user in an Open panel.
 
-Global hotkey uses Carbon RegisterEventHotKey (no Accessibility / Input Monitoring permission). Output is clipboard-only in the App Store build; the app never injects keystrokes into other apps.
+Global hotkey uses Carbon RegisterEventHotKey (no Accessibility / Input Monitoring permission). Output is clipboard-only in the App Store build.
 
 Privacy policy: https://github.com/laihenyi/lailaisay/blob/main/PRIVACY.md
