@@ -113,6 +113,7 @@ rust/fastlane/screenshots/zh-Hant/*.png
 | 2026-10-13 | 1.1 (6) | **已上架**：ASC 原始 API `appStoreVersions` 的 1.0／1.1 都是 `READY_FOR_SALE`；公開商店（iTunes lookup `id6814312066`）顯示 `version=1.1`、`currentVersionReleaseDate=2026-10-12T22:23Z`（台北 10-13 06:23）、`releaseDate=2026-09-29`、免費。注意 `asc status` 的摘要會把已發佈版本寫成 `READY_FOR_DISTRIBUTION`，那是 CLI 的顯示差異，以原始 API 與公開商店為準 |
 
 | 2026-10-19 | 1.2 (7) | 首次使用引導上架送審。`macos/Info.plist` 1.2／build 7；`./scripts/package-macos-app.sh --app-store` 產 pkg（22.8 MB，App Store 簽章）；`fastlane mac release` 上傳 pkg＋metadata＋截圖（metadata 步驟自動建立 1.2 版本紀錄）；build 7 約 2 分鐘 `VALID`；`asc validate --version 1.2` 只剩「no build attached」一條阻擋；`asc review submit --build-id 45ccdb9a-67a8-4a90-9fca-c19e73368aa8 --confirm` 綁定並送審，submission `e139d4ed-f5bd-45f7-a7d9-168deba90c7b`（2026-10-19 14:59 UTC），狀態 `WAITING_FOR_REVIEW`。審查備註回讀 3,164 字元、含 1.2 段與「no third-party AI service」聲明。釋出方式仍為手動 |
+| 2026-10-23 | 1.2 (7) | **已上架**：ASC API `appStoreVersions` 1.2 為 `READY_FOR_SALE`、已綁 build 7（`45ccdb9a-67a8-4a90-9fca-c19e73368aa8`）；公開商店（iTunes lookup `id6814312066`）`version=1.2`、`currentVersionReleaseDate=2026-10-22T22:54Z`（台北 10-23 06:54）。手動發佈已完成 |
 
 ### 5.4 之後每次更新的標準流程
 
@@ -234,7 +235,9 @@ xcrun altool --upload-app   -f dist/lailaisay.pkg -t macos \
 - 設定頁看得到的每一頁都要對得上商店描述（一般／語音模型／自訂辭典／權限）。
 - 被 `ai_polish_supported()`、`speak_to_edit_supported()` 移除的路徑不能被設定檔重新開啟。
 
-## 7. 1.2 送審準備（已於 2026-10-19 送審）
+## 7. 1.2 送審準備（已於 2026-10-19 送審，2026-10-23 上架）
+
+> 本節保留為 1.2 的送審紀錄。ASC 現況：1.2 `READY_FOR_SALE`、綁 build 7；下一版請照 §5.4 走。
 
 - 版本號：`macos/Info.plist` 已是 `1.2` / build `7`（ASC 上最新是 1.1 的 build 6）。
 - 已改：`fastlane/metadata/{zh-Hant,en-US}/release_notes.txt` 換成 1.2 的引導與下載進度條說明；`review_information/notes.txt` 換成 1.2 版（三步引導、新的測試步驟、仍無 AI 潤稿），3,165 字元。
