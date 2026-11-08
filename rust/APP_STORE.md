@@ -29,7 +29,8 @@ Mac App Store 審核強制要求 App Sandbox。Developer ID 版（`macos/lailais
 | `3rd Party Mac Developer Application: Henyi Lai (S6EDV86VSB)`（App Store Connect 憑證 `779932RTZS`，效期至 2027/07/21） | ✅ 鑰匙圈已有私鑰，簽署 `.app` |
 | `3rd Party Mac Developer Installer: Henyi Lai (S6EDV86VSB)`（憑證 `93BXZ5BTR6`，效期至 2027/09/21） | ✅ 2026-09-21 以 API 申請並匯入鑰匙圈，簽署 `.pkg` |
 | `Apple Distribution`（舊憑證；2026-10-17 通知已撤銷，2026-11-08 自鑰匙圈刪除） | ⛔ 已失效，**不可備用**。Mac App Store 不需要它（那是 iOS 用）；現存的新憑證 `D69842W9YH` 效期至 2027/11/08，屬 PilotApp iOS |
-| `Apple Development: Henyi Lai (SESYZEB89N)`（憑證 `U49YYAZ6GV`，效期至 2026/12/08） | ⏳ 2026/12/08 到期。本專案未使用（只影響需要本機除錯簽章的專案，如 NBLM2PPTX `--sandbox-test`） |
+| `Apple Development` 舊憑證（`U49YYAZ6GV`，名稱 `Apple Development: Henyi Lai (SESYZEB89N)`） | ⏳ 2026/12/08 到期。本專案未使用（NBLM2PPTX 的 `--sandbox-test` 原本用它，已改用新版）。刻意不撤銷，讓它自然到期 |
+| `Apple Development` 新憑證（`U3LN3WSS86`，名稱 `Apple Development: Created via API (7AXGRN3B24)`，2026-11-08 以 ASC API 建立） | ✅ 2027/11/08 到期，已匯入鑰匙圈（`4C4A8DD0…`）。NBLM2PPTX `--sandbox-test` 使用 |
 | Bundle ID `com.yikai.lailaisay`（Developer Portal 資源 `2F889GYMND`，platform UNIVERSAL） | ✅ 2026-09-21 註冊 |
 | Provisioning Profile「lailaisay Mac App Store」（`KBMFVU6T89`，MAC_APP_STORE，效期至 2027/07/21） | ✅ 已下載為 `macos/lailaisay-appstore.provisionprofile`（可提交，非機密） |
 | App Store Connect API Key | ✅ Key ID `7AXGRN3B24`、Issuer `69a6de7f-8267-47e3-e053-5b8c7c11a4d1`，私鑰 `AuthKey_7AXGRN3B24.p8` 放在 repo 根目錄（`.gitignore` 與 CI 都會擋下） |
@@ -256,7 +257,8 @@ xcrun altool --upload-app   -f dist/lailaisay.pkg -t macos \
 
 | 憑證 | 到期 |
 | --- | --- |
-| Apple Development（`U49YYAZ6GV`；本專案未使用） | 2026/12/08 |
+| Apple Development 舊（`U49YYAZ6GV`；本專案未使用） | 2026/12/08 |
+| Apple Development 新（`U3LN3WSS86`；NBLM2PPTX `--sandbox-test` 使用） | 2027/11/08 |
 | 3rd Party Mac Developer Application 與 Provisioning Profile | 2027/07/21 |
 | 3rd Party Mac Developer Installer | 2027/09/21 |
 | Developer ID Application（舊 Sub-CA，`69NQSK3F34`；`Y55MNG5ZHP` 2027/01/11 私鑰不在本機） | 2027/02/01 起失效，已由 G2 版取代；舊簽署並公證的 App 不受影響 |
