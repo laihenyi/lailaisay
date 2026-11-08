@@ -35,6 +35,7 @@ load FASTFILE
 
 $checks = 0
 $failures = 0
+$skips = 0
 
 def pass(name)
   $checks += 1
@@ -131,5 +132,44 @@ else
   fail('T7 local_build_number 異常', real.inspect)
 end
 
-puts "\n#{$checks - $failures}/#{$checks} passed"
+# --- pkg 版本比對 -------------------------------------------------------
+# 這幾項需要真的 pkg 才測得到展開邏輯；沒有 dist/lailaisay.pkg 時明確標示
+# SKIP（不算通過），避免「看起來綠燈、其實沒驗到」。
+pkg = PKG_PATH
+
+if File.exist?(pkg)
+  # T8：真實 pkg 與目前設定一致 -> 通過
+  begin
+    verify_pkg_version!(pkg)
+    pass('T8 真實 pkg 版本與設定一致')
+  rescue UserError => e
+    fail('T8 真實 pkg 版本與設定一致', e.message)
+  end
+
+  # T9：設定改了但 pkg 沒重打包 -> 必須擋下
+  original = local_build_number
+  define_method(:local_build_number) { '999' }
+  expect_raise('T9 pkg build 與設定不符時中止', 'pkg 版本與設定不一致') { verify_pkg_version!(pkg) }
+  define_method(:local_build_number) { original }
+
+  # T11：行銷版本不同（例如 Info.plist 已改成 1.3、pkg 還是 1.2）也要擋。
+  # 少了這項，把比對條件改成只比 build 的突變不會被抓到。
+  original_version = marketing_version
+  define_method(:marketing_version) { '9.9' }
+  expect_raise('T11 pkg 行銷版本與設定不符時中止', 'pkg 版本與設定不一致') { verify_pkg_version!(pkg) }
+  define_method(:marketing_version) { original_version }
+else
+  puts "SKIP  T8/T9/T11 找不到 #{pkg}（先跑 ./scripts/package-macos-app.sh --app-store）"
+  $skips += 3
+end
+
+# T10：不是 pkg 的檔案 -> 讀不出就中止，不可放行
+require 'tempfile'
+Tempfile.create(['notapkg', '.pkg']) do |f|
+  f.write("not a pkg")
+  f.flush
+  expect_raise('T10 無法展開 pkg 時中止', '讀不出') { verify_pkg_version!(f.path) }
+end
+
+puts "\n#{$checks - $failures}/#{$checks} passed#{$skips.zero? ? '' : " (#{$skips} skipped)"}"
 exit($failures.zero? ? 0 : 1)

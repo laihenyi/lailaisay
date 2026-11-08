@@ -7,6 +7,8 @@
 #   - dist/lailaisay.pkg produced by the App Store packaging steps.
 default_platform(:mac)
 
+require "tmpdir"
+
 ROOT = File.expand_path("../..", __dir__) # repository root
 KEY_PATH = ENV.fetch("ASC_KEY_PATH", File.join(ROOT, "AuthKey_7AXGRN3B24.p8"))
 KEY_ID = ENV.fetch("ASC_KEY_ID", "7AXGRN3B24")
@@ -81,6 +83,46 @@ def local_build_number
   `/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "#{PLIST_PATH}"`.strip
 end
 
+# 讀出 pkg 內 .app 的版本資訊。pkg 是 fastlane 之外打包的，這裡直接看產物，
+# 而不是相信來源檔（來源改了但沒重新打包時，兩者會不一致）。
+# 回傳 { build:, version: }；展開或讀取失敗時回 nil。
+def pkg_versions(pkg_path)
+  Dir.mktmpdir("pkgverify") do |dir|
+    # pkgutil --expand-full 要求目的路徑不存在（已存在會回 "File exists"），
+    # 所以展開到暫存目錄下的子路徑，而不是 dir 本身。
+    dest = File.join(dir, "expanded")
+    ok = system("pkgutil", "--expand-full", pkg_path, dest, out: File::NULL, err: File::NULL)
+    return nil unless ok
+
+    plist = Dir.glob(File.join(dest, "**", "Contents", "Info.plist")).first
+    return nil unless plist
+
+    {
+      build: `/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "#{plist}" 2>/dev/null`.strip,
+      version: `/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "#{plist}" 2>/dev/null`.strip
+    }
+  end
+end
+
+# pkg 內的版本必須等於目前設定；不等於就代表 dist 裡是上一個版本的殘留產物。
+# 這個檢查存在的理由：fastlane 只確認 pkg 檔案存在，不會發現它沒跟著重新打包，
+# 而 check_version 只拿來源 Info.plist 去比 ASC，也擋不住這件事。
+def verify_pkg_version!(pkg_path)
+  expected_build = local_build_number
+  expected_version = marketing_version
+  actual = pkg_versions(pkg_path)
+
+  if actual.nil? || actual[:build].to_s.empty? || actual[:version].to_s.empty?
+    UI.user_error!("讀不出 #{pkg_path} 內的版本資訊（pkgutil --expand-full 或 PlistBuddy 失敗），" \
+                   "無法確認產物版本。請重新執行 ./scripts/package-macos-app.sh --app-store。")
+  end
+  return if actual[:build] == expected_build && actual[:version] == expected_version
+
+  UI.user_error!("pkg 版本與設定不一致：Info.plist=#{expected_version} (#{expected_build})，" \
+                 "pkg=#{actual[:version]} (#{actual[:build]})。dist 裡是舊產物，" \
+                 "請改好 macos/Info.plist 後重新執行 ./scripts/package-macos-app.sh --app-store。")
+end
+
 # 包裝上傳動作：回報失敗時，若 ASC 確實收到該 build 就視為成功。
 # 上傳前先記錄該 build 是否已存在，避免把「上傳前就有的舊 build」誤當成本次成果。
 def upload_verified(build_number, **options)
@@ -126,6 +168,7 @@ platform :mac do
   lane :beta do
     check_version
     UI.user_error!("Missing #{PKG_PATH}") unless File.exist?(PKG_PATH)
+    verify_pkg_version!(PKG_PATH)
     upload_verified(local_build_number) do
       upload_to_testflight(
         api_key: api_key,
@@ -141,6 +184,7 @@ platform :mac do
   lane :release do
     check_version
     UI.user_error!("Missing #{PKG_PATH}") unless File.exist?(PKG_PATH)
+    verify_pkg_version!(PKG_PATH)
     upload_verified(local_build_number) do
       upload_to_app_store(
         api_key: api_key,

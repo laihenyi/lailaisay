@@ -116,18 +116,23 @@ rust/fastlane/screenshots/zh-Hant/*.png
 | 2026-10-19 | 1.2 (7) | 首次使用引導上架送審。`macos/Info.plist` 1.2／build 7；`./scripts/package-macos-app.sh --app-store` 產 pkg（22.8 MB，App Store 簽章）；`fastlane mac release` 上傳 pkg＋metadata＋截圖（metadata 步驟自動建立 1.2 版本紀錄）；build 7 約 2 分鐘 `VALID`；`asc validate --version 1.2` 只剩「no build attached」一條阻擋；`asc review submit --build-id 45ccdb9a-67a8-4a90-9fca-c19e73368aa8 --confirm` 綁定並送審，submission `e139d4ed-f5bd-45f7-a7d9-168deba90c7b`（2026-10-19 14:59 UTC），狀態 `WAITING_FOR_REVIEW`。審查備註回讀 3,164 字元、含 1.2 段與「no third-party AI service」聲明。釋出方式仍為手動 |
 | 2026-10-23 | 1.2 (7) | **已上架**：ASC API `appStoreVersions` 1.2 為 `READY_FOR_SALE`、已綁 build 7（`45ccdb9a-67a8-4a90-9fca-c19e73368aa8`）；公開商店（iTunes lookup `id6814312066`）`version=1.2`、`currentVersionReleaseDate=2026-10-22T22:54Z`（台北 10-23 06:54）。手動發佈已完成 |
 
-### 5.3.1 上傳誤報與 Fastfile 回歸測試
+### 5.3.1 上傳誤報、pkg 版本比對與 Fastfile 回歸測試
 
 `fastlane mac release`／`beta` 會把上傳結果改以 ASC 上是否真的出現該 build 號來判定（成因見 `rust/fastlane/Fastfile` 的註解：Xcode 27 的 altool 在上傳成功後仍會印一行無害的 `ERROR:`，fastlane 據此回報失敗）。
+
+上傳前也會展開 `dist/lailaisay.pkg`，比對裡面 `.app` 的 `CFBundleShortVersionString`／`CFBundleVersion` 是否等於目前設定（`macos/Info.plist`）。這是因為 pkg 是在 fastlane 之外打包的，fastlane 原本只確認檔案存在——若改過版本卻忘記重新打包，會把舊產物安靜地送上傳。
 
 改動 Fastfile 的上傳流程後，先跑回歸測試（任何目錄皆可，不連線、不上傳）：
 
 ```bash
 ruby rust/fastlane/tests/upload_verified_test.rb
-# 預期 7/7 passed
+# 預期 11/11 passed（沒有 dist/lailaisay.pkg 時 T8/T9/T11 會標成 SKIP）
 ```
 
-測試涵蓋六種判定路徑與一次真實 `Info.plist` 讀取：ASC 有 build 時視為成功、ASC 沒有時視為失敗、上傳前就存在的 build 不得誤判、上傳成功時不多查 ASC、查不到 ASC 時要求人工核對、讀不出 build 號時中止。
+測試涵蓋：
+- 上傳判定六種路徑——ASC 有 build 時視為成功、ASC 沒有時視為失敗、上傳前就存在的 build 不得誤判、上傳成功時不多查 ASC、查不到 ASC 時要求人工核對、讀不出 build 號時中止
+- `local_build_number` 讀到真實 `Info.plist`
+- pkg 版本比對——真實 pkg 通過、build 不符時中止、行銷版本不符時中止、無法展開時中止
 
 ### 5.4 之後每次更新的標準流程
 
