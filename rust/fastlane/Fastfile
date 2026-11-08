@@ -94,7 +94,10 @@ def pkg_versions(pkg_path)
     ok = system("pkgutil", "--expand-full", pkg_path, dest, out: File::NULL, err: File::NULL)
     return nil unless ok
 
-    plist = Dir.glob(File.join(dest, "**", "Contents", "Info.plist")).first
+    # 優先取 Payload 下的主 app：framework 與 helper app 也有 Contents/Info.plist，
+    # 直接抓第一個命中會比對到錯的版本。
+    plist = Dir.glob(File.join(dest, "**", "Payload", "*.app", "Contents", "Info.plist")).first ||
+            Dir.glob(File.join(dest, "**", "Contents", "Info.plist")).first
     return nil unless plist
 
     {
