@@ -41,11 +41,80 @@ def latest_asc_build
   builds.any? ? builds.first.version.to_i : 0
 end
 
+# ⚠️ fastlane 的 altool transporter 只要 altool 輸出含 "ERROR:" 就判定上傳失敗，
+#    但 Xcode 27 的 altool 在「成功」上傳後會印一行無害的
+#    "ERROR: [ContentDelivery.Uploader.*] Failed to create URL for
+#     CDUploaderStateInfoResumeFilePath. The file doesn't exist. (4)"，
+#    導致成功上傳被回報成失敗、lane 以 exit 1 結束（PilotApp 已實測，見該 repo
+#    ios/fastlane/Fastfile）。因此上傳結果改以 ASC 上是否真的出現該 build 號為準。
+
+# 回傳 true / false；查詢本身失敗時回 nil（「無法確認」不可當成「不存在」）
+def asc_build_present?(build_number)
+  require "spaceship"
+  Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
+    key_id: KEY_ID, issuer_id: ISSUER_ID, filepath: KEY_PATH
+  )
+  app = Spaceship::ConnectAPI::App.find(BUNDLE_ID)
+  return nil unless app
+
+  builds = app.get_builds(filter: { "preReleaseVersion.platform" => "MAC_OS" })
+  builds.any? { |b| b.version.to_s == build_number.to_s }
+rescue StandardError => e
+  UI.important("查詢 ASC build 清單失敗（#{e.message.lines.first&.strip}），無法據此判斷上傳結果。")
+  nil
+end
+
+# ASC 索引可能延遲，重試數次。回傳 true / false / nil（無法確認）
+def wait_for_asc_build(build_number, attempts: 6, interval: 20)
+  attempts.times do |i|
+    present = asc_build_present?(build_number)
+    return present unless present.nil?
+    return nil if i == attempts - 1
+
+    UI.message("ASC 尚未出現 build #{build_number}（#{i + 1}/#{attempts}），#{interval} 秒後重試…")
+    sleep(interval)
+  end
+  nil
+end
+
+def local_build_number
+  `/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "#{PLIST_PATH}"`.strip
+end
+
+# 包裝上傳動作：回報失敗時，若 ASC 確實收到該 build 就視為成功。
+# 上傳前先記錄該 build 是否已存在，避免把「上傳前就有的舊 build」誤當成本次成果。
+def upload_verified(build_number, **options)
+  preexisting = build_number.to_s.empty? ? nil : asc_build_present?(build_number)
+  yield
+rescue StandardError => e
+  reason = e.message.lines.first&.strip
+
+  if build_number.to_s.empty?
+    UI.user_error!("上傳失敗，且讀不出本機 build 號，無法判斷是否其實已上傳成功。原始錯誤：#{reason}")
+  end
+  if preexisting
+    UI.user_error!("上傳失敗，且 build #{build_number} 在上傳前就存在於 ASC，" \
+                   "無法確認本次是否成功，請到 App Store Connect 目視核對。原始錯誤：#{reason}")
+  end
+
+  UI.important("上傳回報失敗（#{reason}），但這可能是 altool 無害 ERROR 行造成的誤判。" \
+               "改用 ASC 查核 build #{build_number} 是否已存在…")
+
+  case wait_for_asc_build(build_number)
+  when true
+    UI.success("✅ ASC 已出現 build #{build_number}：上傳其實成功，忽略 fastlane 的誤報。")
+  when false
+    UI.user_error!("build #{build_number} 未出現在 ASC，上傳確實失敗。原始錯誤：#{reason}")
+  else
+    UI.user_error!("無法向 ASC 確認 build #{build_number} 是否存在，請手動核對。原始錯誤：#{reason}")
+  end
+end
+
 platform :mac do
   desc "Compare the newest build on App Store Connect with macos/Info.plist CFBundleVersion"
   lane :check_version do
     latest = latest_asc_build
-    local = sh("/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' ../macos/Info.plist", log: false).strip.to_i
+    local = local_build_number.to_i
     UI.message("App Store Connect: #{latest}  local CFBundleVersion: #{local}")
     if local <= latest && !ENV["SKIP_VERSION_CHECK"]
       UI.user_error!("CFBundleVersion #{local} is not greater than #{latest}; bump macos/Info.plist")
@@ -57,34 +126,38 @@ platform :mac do
   lane :beta do
     check_version
     UI.user_error!("Missing #{PKG_PATH}") unless File.exist?(PKG_PATH)
-    upload_to_testflight(
-      api_key: api_key,
-      pkg: PKG_PATH,
-      app_platform: "osx",
-      skip_waiting_for_build_processing: true,
-      distribute_external: false
-    )
+    upload_verified(local_build_number) do
+      upload_to_testflight(
+        api_key: api_key,
+        pkg: PKG_PATH,
+        app_platform: "osx",
+        skip_waiting_for_build_processing: true,
+        distribute_external: false
+      )
+    end
   end
 
   desc "Upload dist/lailaisay.pkg plus fastlane/metadata to App Store Connect (no review submission)"
   lane :release do
     check_version
     UI.user_error!("Missing #{PKG_PATH}") unless File.exist?(PKG_PATH)
-    upload_to_app_store(
-      api_key: api_key,
-      pkg: PKG_PATH,
-      platform: "osx",
-      app_version: marketing_version,
-      metadata_path: "./fastlane/metadata",
-      screenshots_path: "./fastlane/screenshots",
-      skip_screenshots: !Dir.exist?(File.join(__dir__, "screenshots")),
-      sync_screenshots: true, # checksum-based; avoids re-uploading duplicates on retry
-      force: true,
-      precheck_include_in_app_purchases: false,
-      run_precheck_before_submit: false,
-      submit_for_review: false,
-      automatic_release: false
-    )
+    upload_verified(local_build_number) do
+      upload_to_app_store(
+        api_key: api_key,
+        pkg: PKG_PATH,
+        platform: "osx",
+        app_version: marketing_version,
+        metadata_path: "./fastlane/metadata",
+        screenshots_path: "./fastlane/screenshots",
+        skip_screenshots: !Dir.exist?(File.join(__dir__, "screenshots")),
+        sync_screenshots: true, # checksum-based; avoids re-uploading duplicates on retry
+        force: true,
+        precheck_include_in_app_purchases: false,
+        run_precheck_before_submit: false,
+        submit_for_review: false,
+        automatic_release: false
+      )
+    end
   end
 
   desc "Submit the uploaded build for review"
