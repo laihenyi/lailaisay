@@ -134,6 +134,21 @@ ruby rust/fastlane/tests/upload_verified_test.rb
 - `local_build_number` 讀到真實 `Info.plist`
 - pkg 版本比對——真實 pkg 通過、build 不符時中止、行銷版本不符時中止、無法展開時中止
 
+### 5.3.2 與 NBLM2PPTX 的邏輯一致性
+
+NBLM2PPTX 的 `macos-app/fastlane/Fastfile` 是同一套上傳驗證與 pkg 版本比對的第二份實作。它沒有版控（公開 repo 的 `fastlane/` 在 `.gitignore` 內），所以兩邊會各自演化。
+
+抽成共用模組會讓 NBLM2PPTX 必須依賴 lailaisay 的目錄存在才能執行 fastlane，比重複更脆弱。因此保留兩份實作，改用漂移測試確保邏輯不會走鐘：
+
+```bash
+ruby rust/fastlane/tests/fastfile_drift_test.rb
+# 預期 7/7 passed（找不到 NBLM2PPTX 時 SKIP、exit 0）
+```
+
+測試比對五個共用函式（`asc_build_present?`、`wait_for_asc_build`、`upload_verified`、`pkg_versions`、`verify_pkg_version!`）的正規化後骨架，並確認 `beta`、`release` 兩條 lane 都有呼叫 `verify_pkg_version!`。正規化會抹掉本來就該不同的部分：註解、憑證來源（常數 vs `env!()`）、`local_build_number` 與 `local_build` 的命名、字串內容。
+
+位置可用 `DRIFT_TARGET` 覆寫；改了其中一份就要同步另一份。
+
 ### 5.4 之後每次更新的標準流程
 
 1. 改碼、測試（`cargo test --workspace --features lailaisay-stt/process-whisper`，並以 `--features appstore` 重跑 app/paste crate 測試）。
